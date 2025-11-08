@@ -16,9 +16,10 @@ class HomeController extends Controller
     public function index()
     {
         // Formations populaires (limitées à 6)
+        // ✅ CORRECTION: Changé 'students_count' en 'enrolled_count'
         $formations = Formation::active()
             ->published()
-            ->orderBy('students_count', 'desc')
+            ->orderBy('enrolled_count', 'desc')  // ✅ CORRIGÉ
             ->limit(6)
             ->get();
 
@@ -52,6 +53,19 @@ class HomeController extends Controller
     }
 
     /**
+     * Page Enseignants
+     */
+    public function teachers()
+    {
+        $teachers = User::where('role', 'teacher')
+            ->where('status', 'active')  // ✅ Ajouté filtre sur le statut
+            ->withCount('courses')
+            ->get();
+
+        return view('public.teachers', compact('teachers'));
+    }
+
+    /**
      * Page Contact
      */
     public function contact()
@@ -78,16 +92,27 @@ class HomeController extends Controller
     }
 
     /**
-     * Page Équipe pédagogique
+     * Page Mentions légales
      */
-    public function teachers()
+    public function legal()
     {
-        $teachers = User::where('role', 'teacher')
-            ->where('is_active', true)
-            ->withCount('courses')
-            ->get();
+        return view('public.legal');
+    }
 
-        return view('public.teachers', compact('teachers'));
+    /**
+     * Page Conditions générales
+     */
+    public function terms()
+    {
+        return view('public.terms');
+    }
+
+    /**
+     * Page Politique de confidentialité
+     */
+    public function privacy()
+    {
+        return view('public.privacy');
     }
 
     /**
@@ -103,27 +128,22 @@ class HomeController extends Controller
             ],
             [
                 'question' => 'Les cours sont-ils en direct ?',
-                'answer' => 'Oui, tous nos cours sont dispensés en direct via visioconférence avec possibilité d\'interaction.',
+                'answer' => 'Oui ! Tous nos cours se déroulent en direct avec nos enseignants via visioconférence.',
             ],
-            // ... autres FAQs
+            [
+                'question' => 'Puis-je obtenir un certificat ?',
+                'answer' => 'Oui, vous recevrez un certificat officiel après avoir complété votre formation avec succès.',
+            ],
+            [
+                'question' => 'Quelle est la durée des formations ?',
+                'answer' => 'La durée varie selon les formations, de quelques semaines à plusieurs mois. Consultez la fiche de chaque formation pour plus de détails.',
+            ],
+            [
+                'question' => 'Comment contacter un enseignant ?',
+                'answer' => 'Vous pouvez contacter vos enseignants via la messagerie interne de votre espace étudiant.',
+            ],
         ];
 
         return view('public.faq', compact('faqs'));
-    }
-
-    /**
-     * Conditions Générales d'Utilisation
-     */
-    public function terms()
-    {
-        return view('public.terms');
-    }
-
-    /**
-     * Politique de confidentialité
-     */
-    public function privacy()
-    {
-        return view('public.privacy');
     }
 }

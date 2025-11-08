@@ -54,7 +54,8 @@ class FormationController extends Controller
                 break;
             case 'popular':
             default:
-                $query->orderBy('students_count', 'desc');
+                // ✅ CORRECTION: Changé 'students_count' en 'enrolled_count'
+                $query->orderBy('enrolled_count', 'desc');
                 break;
         }
 
@@ -70,115 +71,95 @@ class FormationController extends Controller
     /**
      * Afficher le détail d'une formation
      */
-    public function show($id)
+    public function show($slug)
     {
         $formation = Formation::active()
             ->published()
+            ->where('slug', $slug)
             ->with(['subjects', 'classes'])
-            ->findOrFail($id);
+            ->firstOrFail();
 
-        // Incrémenter les vues
-        $formation->increment('views_count');
+        // Incrémenter les vues (si colonne existe)
+        if (\Schema::hasColumn('formations', 'views_count')) {
+            $formation->increment('views_count');
+        }
 
         // Formations similaires
         $similarFormations = Formation::active()
             ->published()
+            ->where('level', $formation->level)
             ->where('id', '!=', $formation->id)
-            ->where('category', $formation->category)
+            // ✅ CORRECTION: Changé 'students_count' en 'enrolled_count'
+            ->orderBy('enrolled_count', 'desc')
             ->limit(3)
             ->get();
 
-        // Statistiques
-        $stats = [
-            'total_students' => $formation->enrollments()->count(),
-            'success_rate' => $formation->getSuccessRate(),
-            'average_rating' => $formation->getAverageRating(),
-            'total_hours' => $formation->getTotalHours(),
-        ];
+        // Avis (TODO: créer modèle Review)
+        $reviews = [];
 
-        // Vérifier si l'utilisateur est déjà inscrit
-        $isEnrolled = false;
-        if (auth()->check()) {
-            $isEnrolled = Enrollment::where('student_id', auth()->id())
-                ->where('formation_id', $formation->id)
-                ->exists();
-        }
-
-        return view('formations.show', compact('formation', 'similarFormations', 'stats', 'isEnrolled'));
+        return view('formations.show', compact('formation', 'similarFormations', 'reviews'));
     }
 
     /**
-     * Afficher le formulaire d'inscription à une formation
+     * Inscription à une formation
      */
-    public function enroll($id)
+    public function enroll(Request $request, Formation $formation)
     {
-        // Rediriger vers login si non authentifié
+        // Vérifier que l'utilisateur est connecté
         if (!auth()->check()) {
             return redirect()->route('login')
-                ->with('info', 'Veuillez vous connecter pour vous inscrire.');
+                ->with('error', 'Vous devez être connecté pour vous inscrire.');
         }
 
-        $formation = Formation::active()
-            ->published()
-            ->findOrFail($id);
+        // Vérifier que l'utilisateur est un étudiant
+        if (auth()->user()->role !== 'student') {
+            return back()->with('error', 'Seuls les étudiants peuvent s\'inscrire à une formation.');
+        }
 
         // Vérifier si déjà inscrit
         $existingEnrollment = Enrollment::where('student_id', auth()->id())
             ->where('formation_id', $formation->id)
+            ->whereIn('status', ['active', 'pending'])
             ->first();
 
         if ($existingEnrollment) {
-            return redirect()->route('formations.show', $formation->id)
-                ->with('warning', 'Vous êtes déjà inscrit à cette formation.');
+            return back()->with('error', 'Vous êtes déjà inscrit à cette formation.');
         }
 
-        // Vérifier les prérequis
-        if (!$formation->checkPrerequisites(auth()->user())) {
-            return redirect()->route('formations.show', $formation->id)
-                ->with('error', 'Vous ne remplissez pas les prérequis pour cette formation.');
-        }
-
-        return view('formations.enroll', compact('formation'));
-    }
-
-    /**
-     * Traiter l'inscription à une formation
-     */
-    public function processEnrollment(Request $request, $id)
-    {
+        // Valider les données
         $validated = $request->validate([
-            'motivation' => 'nullable|string|max:1000',
+            'class_id' => 'nullable|exists:classes,id',
             'payment_method' => 'required|in:card,paypal,bank_transfer',
-            'accept_terms' => 'required|accepted',
         ]);
 
-        $formation = Formation::active()
-            ->published()
-            ->findOrFail($id);
-
-        // Créer l'inscription avec statut pending
+        // Créer l'inscription
         $enrollment = Enrollment::create([
             'student_id' => auth()->id(),
             'formation_id' => $formation->id,
+            'class_id' => $validated['class_id'] ?? null,
             'enrollment_date' => now(),
             'status' => 'pending',
             'payment_status' => 'unpaid',
-            'notes' => $validated['motivation'] ?? null,
         ]);
 
-        // Créer le paiement
-        $payment = $enrollment->payments()->create([
-            'student_id' => auth()->id(),
-            'formation_id' => $formation->id,
-            'amount' => $formation->price,
-            'currency' => 'eur',
-            'payment_method' => $validated['payment_method'],
-            'status' => 'pending',
-        ]);
+        // Créer le paiement (si modèle Payment existe)
+        if (class_exists('\App\Models\Payment')) {
+            $payment = $enrollment->payments()->create([
+                'student_id' => auth()->id(),
+                'formation_id' => $formation->id,
+                'amount' => $formation->discounted_price,
+                'currency' => 'eur',
+                'payment_method' => $validated['payment_method'],
+                'status' => 'pending',
+            ]);
 
-        // Rediriger vers le paiement
-        return redirect()->route('payments.process', $payment->id)
-            ->with('success', 'Votre inscription a été enregistrée. Veuillez procéder au paiement.');
+            // Rediriger vers le paiement
+            return redirect()->route('payments.process', $payment->id)
+                ->with('success', 'Votre inscription a été enregistrée. Veuillez procéder au paiement.');
+        }
+
+        return redirect()->route('student.dashboard')
+            ->with('success', 'Votre inscription a été enregistrée avec succès !');
     }
 
     /**
@@ -189,7 +170,8 @@ class FormationController extends Controller
         $formations = Formation::active()
             ->published()
             ->where('category', $category)
-            ->orderBy('students_count', 'desc')
+            // ✅ CORRECTION: Changé 'students_count' en 'enrolled_count'
+            ->orderBy('enrolled_count', 'desc')
             ->paginate(12);
 
         return view('formations.category', compact('formations', 'category'));
@@ -202,10 +184,31 @@ class FormationController extends Controller
     {
         $formations = Formation::active()
             ->published()
-            ->where('has_certificate', true)
-            ->orderBy('students_count', 'desc')
+            ->where('certificate_available', true)
+            // ✅ CORRECTION: Changé 'students_count' en 'enrolled_count'
+            ->orderBy('enrolled_count', 'desc')
             ->get();
 
         return view('formations.certificates', compact('formations'));
+    }
+
+    /**
+     * Recherche de formations
+     */
+    public function search(Request $request)
+    {
+        $query = $request->input('q');
+        
+        $formations = Formation::active()
+            ->published()
+            ->where(function($q) use ($query) {
+                $q->where('title', 'like', "%{$query}%")
+                  ->orWhere('description', 'like', "%{$query}%")
+                  ->orWhere('objectives', 'like', "%{$query}%");
+            })
+            ->orderBy('enrolled_count', 'desc')
+            ->paginate(12);
+
+        return view('formations.search', compact('formations', 'query'));
     }
 }

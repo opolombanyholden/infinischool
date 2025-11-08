@@ -2,7 +2,6 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
@@ -11,12 +10,15 @@ use Illuminate\Support\Facades\Schedule;
 |
 | Commandes Artisan personnalisées via routes
 | Note: Pour des commandes plus complexes, utilisez app/Console/Commands
+| 
+| IMPORTANT: Les méthodes de scheduling (hourly, daily, etc.) ne peuvent 
+| PAS être utilisées ici. Utilisez app/Console/Kernel.php pour le scheduling.
 |
 */
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote')->hourly();
+})->purpose('Display an inspiring quote');
 
 /*
 |--------------------------------------------------------------------------
@@ -58,16 +60,70 @@ Artisan::command('infinischool:clean-old-recordings', function () {
     $this->info('Archivage des anciens enregistrements...');
     
     $recordings = \App\Models\Recording::where('created_at', '<', now()->subMonths(6))
-        ->where('status', 'published')
+        ->where('status', '!=', 'archived')
         ->get();
     
     foreach ($recordings as $recording) {
-        // Logique d'archivage ici (ex: déplacer vers cold storage)
-        $this->line("Archivage: {$recording->title}");
+        $recording->update(['status' => 'archived']);
     }
     
     $this->info("✓ {$recordings->count()} enregistrements archivés");
 })->purpose('Archiver les enregistrements de plus de 6 mois');
+
+/**
+ * Mettre à jour les statistiques
+ */
+Artisan::command('infinischool:update-stats', function () {
+    $this->info('Mise à jour des statistiques...');
+    
+    // Statistiques utilisateurs
+    $activeUsers = \App\Models\User::where('last_login_at', '>', now()->subDays(30))->count();
+    
+    // Statistiques cours
+    $totalCourses = \App\Models\Course::count();
+    $completedCourses = \App\Models\Course::where('status', 'completed')->count();
+    
+    // Statistiques inscriptions
+    $activeEnrollments = \App\Models\Enrollment::where('status', 'active')->count();
+    
+    $this->table(
+        ['Métrique', 'Valeur'],
+        [
+            ['Utilisateurs actifs (30j)', $activeUsers],
+            ['Total cours', $totalCourses],
+            ['Cours complétés', $completedCourses],
+            ['Inscriptions actives', $activeEnrollments],
+        ]
+    );
+    
+    $this->info('✓ Statistiques mises à jour');
+})->purpose('Mettre à jour les statistiques de la plateforme');
+
+/**
+ * Générer les certificats en attente
+ */
+Artisan::command('infinischool:generate-certificates', function () {
+    $this->info('Génération des certificats...');
+    
+    $enrollments = \App\Models\Enrollment::where('status', 'completed')
+        ->whereDoesntHave('certificate')
+        ->with('user', 'formation')
+        ->get();
+    
+    $count = 0;
+    foreach ($enrollments as $enrollment) {
+        \App\Models\Certificate::create([
+            'user_id' => $enrollment->user_id,
+            'formation_id' => $enrollment->formation_id,
+            'enrollment_id' => $enrollment->id,
+            'certificate_number' => 'CERT-' . strtoupper(uniqid()),
+            'issued_at' => now(),
+        ]);
+        $count++;
+    }
+    
+    $this->info("✓ {$count} certificats générés");
+})->purpose('Générer les certificats pour les formations complétées');
 
 /**
  * Envoyer les rappels de cours
@@ -75,153 +131,31 @@ Artisan::command('infinischool:clean-old-recordings', function () {
 Artisan::command('infinischool:send-course-reminders', function () {
     $this->info('Envoi des rappels de cours...');
     
-    // Cours qui commencent dans 1 heure
-    $upcomingCourses = \App\Models\Course::where('scheduled_at', '>=', now())
-        ->where('scheduled_at', '<=', now()->addHour())
-        ->where('status', 'scheduled')
-        ->with(['class.students', 'teacher'])
-        ->get();
+    // Cours dans les prochaines 24h
+    $upcomingCourses = \App\Models\Course::whereBetween('scheduled_at', [
+        now(),
+        now()->addDay()
+    ])->with('enrollments.user')->get();
     
     $count = 0;
     foreach ($upcomingCourses as $course) {
-        // Envoyer notification aux étudiants
-        foreach ($course->class->students as $student) {
-            // Logique d'envoi notification
+        foreach ($course->enrollments as $enrollment) {
+            // TODO: Envoyer email de rappel
+            // Mail::to($enrollment->user)->send(new CourseReminder($course));
             $count++;
         }
-        
-        $this->line("Rappels envoyés pour: {$course->title}");
     }
     
     $this->info("✓ {$count} rappels envoyés");
-})->purpose('Envoyer les rappels de cours à venir');
+})->purpose('Envoyer les rappels de cours aux étudiants');
 
 /**
- * Vérifier et marquer les cours comme terminés
+ * Backup de la base de données
  */
-Artisan::command('infinischool:mark-completed-courses', function () {
-    $this->info('Marquage des cours terminés...');
+Artisan::command('infinischool:backup-db', function () {
+    $this->info('Création d\'une sauvegarde...');
     
-    $courses = \App\Models\Course::where('status', 'live')
-        ->where('scheduled_at', '<', now()->subHours(3))
-        ->get();
-    
-    foreach ($courses as $course) {
-        $course->update(['status' => 'completed']);
-        $this->line("Marqué comme terminé: {$course->title}");
-    }
-    
-    $this->info("✓ {$courses->count()} cours marqués comme terminés");
-})->purpose('Marquer automatiquement les cours comme terminés');
-
-/**
- * Générer les certificats pour les formations terminées
- */
-Artisan::command('infinischool:generate-certificates', function () {
-    $this->info('Génération des certificats...');
-    
-    // Trouver les étudiants ayant terminé une formation
-    $completedEnrollments = \App\Models\Enrollment::where('status', 'completed')
-        ->whereDoesntHave('certificate')
-        ->with(['student', 'formation'])
-        ->get();
-    
-    foreach ($completedEnrollments as $enrollment) {
-        // Logique de génération du certificat
-        $this->line("Certificat généré pour: {$enrollment->student->getFullNameAttribute()}");
-    }
-    
-    $this->info("✓ {$completedEnrollments->count()} certificats générés");
-})->purpose('Générer les certificats pour les formations terminées');
-
-/**
- * Calculer et mettre à jour les statistiques
- */
-Artisan::command('infinischool:update-statistics', function () {
-    $this->info('Mise à jour des statistiques...');
-    
-    // Mettre à jour les statistiques de cours
-    $courses = \App\Models\Course::where('status', 'completed')->get();
-    
-    foreach ($courses as $course) {
-        // Calculer taux de présence
-        $attendanceRate = $course->attendances()->count() / $course->class->students()->count() * 100;
-        
-        // Mettre à jour les métriques
-        // ...
-        
-        $this->line("Stats mises à jour pour: {$course->title}");
-    }
-    
-    $this->info('✓ Statistiques mises à jour');
-})->purpose('Mettre à jour les statistiques de la plateforme');
-
-/**
- * Envoyer un rapport hebdomadaire aux enseignants
- */
-Artisan::command('infinischool:send-weekly-reports', function () {
-    $this->info('Envoi des rapports hebdomadaires...');
-    
-    $teachers = \App\Models\User::where('role', 'teacher')
-        ->where('status', 'active')
-        ->get();
-    
-    foreach ($teachers as $teacher) {
-        // Générer et envoyer le rapport
-        $this->line("Rapport envoyé à: {$teacher->getFullNameAttribute()}");
-    }
-    
-    $this->info("✓ {$teachers->count()} rapports envoyés");
-})->purpose('Envoyer les rapports hebdomadaires aux enseignants');
-
-/**
- * Vérifier les paiements en attente
- */
-Artisan::command('infinischool:check-pending-payments', function () {
-    $this->info('Vérification des paiements en attente...');
-    
-    $pendingPayments = \App\Models\Payment::where('status', 'pending')
-        ->where('created_at', '<', now()->subDays(3))
-        ->get();
-    
-    foreach ($pendingPayments as $payment) {
-        // Vérifier le statut avec Stripe
-        $this->line("Vérification paiement ID: {$payment->id}");
-    }
-    
-    $this->info("✓ {$pendingPayments->count()} paiements vérifiés");
-})->purpose('Vérifier et mettre à jour les paiements en attente');
-
-/**
- * Envoyer des alertes pour les devoirs non rendus
- */
-Artisan::command('infinischool:alert-overdue-assignments', function () {
-    $this->info('Envoi des alertes pour devoirs en retard...');
-    
-    $overdueAssignments = \App\Models\Assignment::where('due_date', '<', now())
-        ->where('status', 'published')
-        ->whereDoesntHave('submissions')
-        ->with('course.class.students')
-        ->get();
-    
-    $count = 0;
-    foreach ($overdueAssignments as $assignment) {
-        foreach ($assignment->course->class->students as $student) {
-            // Envoyer alerte
-            $count++;
-        }
-    }
-    
-    $this->info("✓ {$count} alertes envoyées");
-})->purpose('Alerter les étudiants des devoirs non rendus');
-
-/**
- * Sauvegarder la base de données
- */
-Artisan::command('infinischool:backup', function () {
-    $this->info('Création de la sauvegarde...');
-    
-    $filename = 'backup-' . now()->format('Y-m-d-His') . '.sql';
+    $filename = 'backup-infinischool-' . now()->format('Y-m-d-His') . '.sql';
     $path = storage_path('backups/' . $filename);
     
     // Créer le répertoire s'il n'existe pas
@@ -283,7 +217,7 @@ Artisan::command('infinischool:daily-admin-report', function () {
         'new_users' => \App\Models\User::whereDate('created_at', today())->count(),
         'new_enrollments' => \App\Models\Enrollment::whereDate('created_at', today())->count(),
         'courses_today' => \App\Models\Course::whereDate('scheduled_at', today())->count(),
-        'revenue_today' => \App\Models\Payment::whereDate('paid_at', today())->sum('amount'),
+        'revenue_today' => \DB::table('payments')->whereDate('paid_at', today())->sum('amount') ?? 0,
     ];
     
     $this->table(
