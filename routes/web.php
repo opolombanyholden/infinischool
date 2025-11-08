@@ -1,12 +1,28 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
+// Controllers de base
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\FormationController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EnrollmentController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\TeacherController;
+
+// Controllers d'authentification
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\Auth\VerificationController;
+use App\Http\Controllers\Auth\SocialController;
+
+// Controllers communs (tous rôles)
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SupportController;
 
 // Controllers Étudiant
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
@@ -19,101 +35,112 @@ use App\Http\Controllers\Student\RecordingController as StudentRecordingControll
 use App\Http\Controllers\Student\GradeController as StudentGradeController;
 use App\Http\Controllers\Student\CertificateController as StudentCertificateController;
 use App\Http\Controllers\Student\CommunityController as StudentCommunityController;
-use App\Http\Controllers\Student\SupportController as StudentSupportController;
-use App\Http\Controllers\Student\ProfileController as StudentProfileController;
 
 // Controllers Enseignant
 use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
-use App\Http\Controllers\Teacher\ScheduleController as TeacherScheduleController;
 use App\Http\Controllers\Teacher\CourseController as TeacherCourseController;
+use App\Http\Controllers\Teacher\ScheduleController as TeacherScheduleController;
 use App\Http\Controllers\Teacher\ClassController as TeacherClassController;
 use App\Http\Controllers\Teacher\ResourceController as TeacherResourceController;
 use App\Http\Controllers\Teacher\GradeController as TeacherGradeController;
 use App\Http\Controllers\Teacher\AnalyticsController as TeacherAnalyticsController;
+use App\Http\Controllers\Teacher\StudentController as TeacherStudentController;
 use App\Http\Controllers\Teacher\MessageController as TeacherMessageController;
-use App\Http\Controllers\Teacher\RecordingController as TeacherRecordingController;
-use App\Http\Controllers\Teacher\ProfileController as TeacherProfileController;
+use App\Http\Controllers\Teacher\EarningController as TeacherEarningController;
 
-// Controllers Admin
+// Controllers Administrateur
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\FormationController as AdminFormationController;
 use App\Http\Controllers\Admin\ClassController as AdminClassController;
 use App\Http\Controllers\Admin\TeacherController as AdminTeacherController;
 use App\Http\Controllers\Admin\StudentController as AdminStudentController;
-use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\RevenueController as AdminRevenueController;
+use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
+use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
+use App\Http\Controllers\Admin\SupportController as AdminSupportController;
+use App\Http\Controllers\Admin\RequestController as AdminRequestController;
+use App\Http\Controllers\Admin\AlertController as AdminAlertController;
+use App\Http\Controllers\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Admin\SystemController as AdminSystemController;
-use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 
 /*
 |--------------------------------------------------------------------------
 | Routes Publiques
 |--------------------------------------------------------------------------
-|
-| Routes accessibles sans authentification
-|
 */
 
 // Page d'accueil
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // Pages d'information
-Route::get('/a-propos', [HomeController::class, 'about'])->name('about');
-Route::get('/enseignants', [HomeController::class, 'teachers'])->name('teachers');
-Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
-Route::post('/contact', [HomeController::class, 'sendContact'])->name('contact.send');
+Route::get('/about', [PageController::class, 'about'])->name('about');
+Route::get('/teachers', [PageController::class, 'teachers'])->name('teachers');
+Route::get('/teachers/{teacher}', [TeacherController::class, 'show'])->name('teachers.show');
+Route::get('/contact', [PageController::class, 'contact'])->name('contact');
+Route::post('/contact', [ContactController::class, 'send'])->name('contact.send');
+Route::get('/faq', [PageController::class, 'faq'])->name('faq');
+Route::get('/blog', [PageController::class, 'blog'])->name('blog');
 
-// Formations
+// Formations publiques
 Route::get('/formations', [FormationController::class, 'index'])->name('formations.index');
-Route::get('/formations/{formation:slug}', [FormationController::class, 'show'])->name('formations.show');
+Route::get('/formations/{slug}', [FormationController::class, 'show'])->name('formations.show');
 
 // Pages légales
-Route::get('/mentions-legales', [HomeController::class, 'legal'])->name('legal');
-Route::get('/conditions-generales', [HomeController::class, 'terms'])->name('terms');
-Route::get('/politique-confidentialite', [HomeController::class, 'privacy'])->name('privacy');
+Route::get('/terms', [PageController::class, 'terms'])->name('terms');
+Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
+Route::get('/legal', [PageController::class, 'legal'])->name('legal');
 
 /*
 |--------------------------------------------------------------------------
 | Routes d'Authentification
 |--------------------------------------------------------------------------
-|
-| Routes pour login, register, password reset, email verification
-|
 */
 
 // Connexion
-Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [LoginController::class, 'login']);
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 // Inscription
-Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
-Route::post('/register', [AuthController::class, 'register']);
+Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+Route::post('/register', [RegisterController::class, 'register']);
 
 // Mot de passe oublié
-Route::get('/password/reset', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
-Route::post('/password/email', [AuthController::class, 'sendResetLinkEmail'])->name('password.email');
-Route::get('/password/reset/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
-Route::post('/password/reset', [AuthController::class, 'resetPassword'])->name('password.update');
+Route::get('/password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+Route::post('/password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+Route::get('/password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+Route::post('/password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
 
 // Vérification email
-Route::get('/email/verify', [AuthController::class, 'showVerifyEmailNotice'])->name('verification.notice');
-Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
-Route::post('/email/resend', [AuthController::class, 'resendVerificationEmail'])->name('verification.resend');
+Route::get('/email/verify', [VerificationController::class, 'show'])->name('verification.notice');
+Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->name('verification.verify');
+Route::post('/email/resend', [VerificationController::class, 'resend'])->name('verification.resend');
+
+// OAuth Social Login
+Route::get('/auth/{provider}', [SocialController::class, 'redirect'])->name('auth.social');
+Route::get('/auth/{provider}/callback', [SocialController::class, 'callback']);
 
 /*
 |--------------------------------------------------------------------------
-| Routes Authentifiées
+| Routes Authentifiées - Communes à tous les rôles
 |--------------------------------------------------------------------------
-|
-| Routes communes à tous les utilisateurs authentifiés
-|
 */
 
 Route::middleware(['auth'])->group(function () {
     
-    // Dashboard - Redirection selon rôle
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Profil utilisateur
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
+    Route::delete('/profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
+    Route::put('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
+    Route::post('/profile/2fa/enable', [ProfileController::class, 'enable2FA'])->name('profile.2fa.enable');
+    Route::delete('/profile/2fa/disable', [ProfileController::class, 'disable2FA'])->name('profile.2fa.disable');
+    Route::delete('/profile', [ProfileController::class, 'delete'])->name('profile.delete');
     
     // Messagerie (accessible à tous les rôles)
     Route::prefix('messages')->name('messages.')->group(function () {
@@ -135,39 +162,51 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
     
+    // Support (accessible à tous les rôles)
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('/', [SupportController::class, 'index'])->name('index');
+        Route::get('/create', [SupportController::class, 'create'])->name('create');
+        Route::post('/', [SupportController::class, 'store'])->name('store');
+        Route::get('/{ticket}', [SupportController::class, 'show'])->name('show');
+        Route::post('/{ticket}/reply', [SupportController::class, 'reply'])->name('reply');
+        Route::post('/{ticket}/close', [SupportController::class, 'close'])->name('close');
+    });
+    
 });
 
 /*
 |--------------------------------------------------------------------------
-| Routes Espace Étudiant
+| Routes Étudiant
 |--------------------------------------------------------------------------
-|
-| Middleware: auth, verified, role:student
-|
 */
 
-Route::prefix('student')->name('student.')->middleware(['auth', 'verified', 'role:student'])->group(function () {
+Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [StudentDashboardController::class, 'index'])->name('dashboard');
     
-    // Mes Cours
+    // Formations/Cours
     Route::prefix('courses')->name('courses.')->group(function () {
         Route::get('/', [StudentCourseController::class, 'index'])->name('index');
-        Route::get('/{course}', [StudentCourseController::class, 'show'])->name('show');
-        Route::post('/{course}/join', [StudentCourseController::class, 'join'])->name('join');
-        Route::get('/{course}/live', [StudentCourseController::class, 'live'])->name('live');
+        Route::get('/{enrollment}', [StudentCourseController::class, 'show'])->name('show');
+        Route::get('/{enrollment}/continue', [StudentCourseController::class, 'continue'])->name('continue');
+        Route::get('/{enrollment}/resume', [StudentCourseController::class, 'resume'])->name('resume');
+        Route::post('/{enrollment}/complete-lesson', [StudentCourseController::class, 'completeLesson'])->name('complete-lesson');
     });
     
-    // Planning / Emploi du temps
-    Route::get('/schedule', [StudentScheduleController::class, 'index'])->name('schedule');
-    Route::get('/schedule/export', [StudentScheduleController::class, 'export'])->name('schedule.export');
+    // Planning/Calendrier
+    Route::prefix('schedule')->name('schedule.')->group(function () {
+        Route::get('/', [StudentScheduleController::class, 'index'])->name('index');
+        Route::get('/ical', [StudentScheduleController::class, 'ical'])->name('ical');
+    });
     
     // Progression
-    Route::get('/progress', [StudentProgressController::class, 'index'])->name('progress');
-    Route::get('/progress/{subject}', [StudentProgressController::class, 'show'])->name('progress.show');
+    Route::prefix('progress')->name('progress.')->group(function () {
+        Route::get('/', [StudentProgressController::class, 'index'])->name('index');
+        Route::get('/{enrollment}', [StudentProgressController::class, 'show'])->name('show');
+    });
     
-    // Devoirs / Assignments
+    // Devoirs
     Route::prefix('assignments')->name('assignments.')->group(function () {
         Route::get('/', [StudentAssignmentController::class, 'index'])->name('index');
         Route::get('/{assignment}', [StudentAssignmentController::class, 'show'])->name('show');
@@ -179,77 +218,60 @@ Route::prefix('student')->name('student.')->middleware(['auth', 'verified', 'rol
     Route::prefix('resources')->name('resources.')->group(function () {
         Route::get('/', [StudentResourceController::class, 'index'])->name('index');
         Route::get('/{resource}/download', [StudentResourceController::class, 'download'])->name('download');
-        Route::get('/{resource}/view', [StudentResourceController::class, 'view'])->name('view');
     });
     
-    // Replay / Enregistrements
-    Route::prefix('replay')->name('replay.')->group(function () {
+    // Enregistrements de cours
+    Route::prefix('recordings')->name('recordings.')->group(function () {
         Route::get('/', [StudentRecordingController::class, 'index'])->name('index');
         Route::get('/{recording}', [StudentRecordingController::class, 'show'])->name('show');
-        Route::get('/{recording}/watch', [StudentRecordingController::class, 'watch'])->name('watch');
     });
     
-    // Notes / Grades
+    // Notes
     Route::prefix('grades')->name('grades.')->group(function () {
         Route::get('/', [StudentGradeController::class, 'index'])->name('index');
-        Route::get('/subject/{subject}', [StudentGradeController::class, 'bySubject'])->name('by-subject');
-        Route::get('/export', [StudentGradeController::class, 'export'])->name('export');
+        Route::get('/{enrollment}', [StudentGradeController::class, 'show'])->name('show');
     });
     
     // Certificats
     Route::prefix('certificates')->name('certificates.')->group(function () {
         Route::get('/', [StudentCertificateController::class, 'index'])->name('index');
-        Route::get('/{certificate}/download', [StudentCertificateController::class, 'download'])->name('download');
-        Route::get('/{certificate}/view', [StudentCertificateController::class, 'view'])->name('view');
+        Route::get('/{enrollment}/download', [StudentCertificateController::class, 'download'])->name('download');
+        Route::get('/{certificate}/verify', [StudentCertificateController::class, 'verify'])->name('verify');
     });
     
-    // Communauté / Forum
+    // Communauté/Forum
     Route::prefix('community')->name('community.')->group(function () {
         Route::get('/', [StudentCommunityController::class, 'index'])->name('index');
-        Route::get('/topic/{topic}', [StudentCommunityController::class, 'show'])->name('show');
-        Route::post('/topic', [StudentCommunityController::class, 'createTopic'])->name('create-topic');
-        Route::post('/topic/{topic}/reply', [StudentCommunityController::class, 'reply'])->name('reply');
-    });
-    
-    // Support / Centre d'aide
-    Route::prefix('support')->name('support.')->group(function () {
-        Route::get('/', [StudentSupportController::class, 'index'])->name('index');
-        Route::get('/create', [StudentSupportController::class, 'create'])->name('create');
-        Route::post('/', [StudentSupportController::class, 'store'])->name('store');
-        Route::get('/{ticket}', [StudentSupportController::class, 'show'])->name('show');
-        Route::post('/{ticket}/reply', [StudentSupportController::class, 'reply'])->name('reply');
-    });
-    
-    // Profil
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [StudentProfileController::class, 'index'])->name('index');
-        Route::get('/edit', [StudentProfileController::class, 'edit'])->name('edit');
-        Route::put('/', [StudentProfileController::class, 'update'])->name('update');
-        Route::put('/password', [StudentProfileController::class, 'updatePassword'])->name('update-password');
-        Route::post('/avatar', [StudentProfileController::class, 'updateAvatar'])->name('update-avatar');
+        Route::get('/{topic}', [StudentCommunityController::class, 'show'])->name('show');
+        Route::post('/{topic}/reply', [StudentCommunityController::class, 'reply'])->name('reply');
     });
     
 });
 
 /*
 |--------------------------------------------------------------------------
-| Routes Espace Enseignant
+| Routes Inscription Formation (authentifiées)
 |--------------------------------------------------------------------------
-|
-| Middleware: auth, verified, role:teacher
-|
 */
 
-Route::prefix('teacher')->name('teacher.')->middleware(['auth', 'verified', 'role:teacher'])->group(function () {
+Route::middleware(['auth'])->group(function () {
+    Route::get('/formations/{slug}/enroll', [EnrollmentController::class, 'create'])->name('formations.enroll');
+    Route::post('/formations/{slug}/enroll', [EnrollmentController::class, 'store'])->name('formations.enroll.store');
+    Route::post('/enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->name('enrollments.cancel');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Routes Enseignant
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('dashboard');
     
-    // Planning / Emploi du temps
-    Route::get('/schedule', [TeacherScheduleController::class, 'index'])->name('schedule');
-    Route::get('/schedule/export', [TeacherScheduleController::class, 'export'])->name('schedule.export');
-    
-    // Programmer / Gérer les cours
+    // Gestion des cours/formations
     Route::prefix('courses')->name('courses.')->group(function () {
         Route::get('/', [TeacherCourseController::class, 'index'])->name('index');
         Route::get('/create', [TeacherCourseController::class, 'create'])->name('create');
@@ -258,122 +280,88 @@ Route::prefix('teacher')->name('teacher.')->middleware(['auth', 'verified', 'rol
         Route::get('/{course}/edit', [TeacherCourseController::class, 'edit'])->name('edit');
         Route::put('/{course}', [TeacherCourseController::class, 'update'])->name('update');
         Route::delete('/{course}', [TeacherCourseController::class, 'destroy'])->name('destroy');
-        
-        // Actions spécifiques
-        Route::post('/{course}/start', [TeacherCourseController::class, 'start'])->name('start');
-        Route::post('/{course}/end', [TeacherCourseController::class, 'end'])->name('end');
-        Route::get('/{course}/live', [TeacherCourseController::class, 'live'])->name('live');
-        Route::post('/{course}/generate-zoom', [TeacherCourseController::class, 'generateZoomLink'])->name('generate-zoom');
-        Route::post('/{course}/start-recording', [TeacherCourseController::class, 'startRecording'])->name('start-recording');
-        Route::post('/{course}/stop-recording', [TeacherCourseController::class, 'stopRecording'])->name('stop-recording');
-        Route::get('/{course}/attendance', [TeacherCourseController::class, 'attendance'])->name('attendance');
-        Route::post('/{course}/attendance', [TeacherCourseController::class, 'saveAttendance'])->name('save-attendance');
+        Route::get('/{course}/students', [TeacherCourseController::class, 'students'])->name('students');
+        Route::post('/{course}/publish', [TeacherCourseController::class, 'publish'])->name('publish');
+        Route::post('/{course}/unpublish', [TeacherCourseController::class, 'unpublish'])->name('unpublish');
     });
     
-    // Mes Classes
+    // Planning
+    Route::prefix('schedule')->name('schedule.')->group(function () {
+        Route::get('/', [TeacherScheduleController::class, 'index'])->name('index');
+        Route::get('/create', [TeacherScheduleController::class, 'create'])->name('create');
+        Route::post('/', [TeacherScheduleController::class, 'store'])->name('store');
+        Route::get('/{class}/edit', [TeacherScheduleController::class, 'edit'])->name('edit');
+        Route::put('/{class}', [TeacherScheduleController::class, 'update'])->name('update');
+        Route::delete('/{class}', [TeacherScheduleController::class, 'destroy'])->name('destroy');
+    });
+    
+    // Classes en direct
     Route::prefix('classes')->name('classes.')->group(function () {
         Route::get('/', [TeacherClassController::class, 'index'])->name('index');
         Route::get('/{class}', [TeacherClassController::class, 'show'])->name('show');
-        Route::get('/{class}/students', [TeacherClassController::class, 'students'])->name('students');
-        Route::get('/{class}/export', [TeacherClassController::class, 'exportStudents'])->name('export-students');
+        Route::post('/{class}/start', [TeacherClassController::class, 'start'])->name('start');
+        Route::post('/{class}/end', [TeacherClassController::class, 'end'])->name('end');
+        Route::post('/{class}/attendance', [TeacherClassController::class, 'recordAttendance'])->name('attendance');
     });
     
-    // Contenus / Ressources
+    // Ressources
     Route::prefix('resources')->name('resources.')->group(function () {
         Route::get('/', [TeacherResourceController::class, 'index'])->name('index');
-        Route::get('/create', [TeacherResourceController::class, 'create'])->name('create');
+        Route::get('/upload', [TeacherResourceController::class, 'create'])->name('upload');
         Route::post('/', [TeacherResourceController::class, 'store'])->name('store');
-        Route::get('/{resource}', [TeacherResourceController::class, 'show'])->name('show');
         Route::delete('/{resource}', [TeacherResourceController::class, 'destroy'])->name('destroy');
-        Route::get('/{resource}/download', [TeacherResourceController::class, 'download'])->name('download');
     });
     
-    // Assignments / Devoirs
-    Route::prefix('assignments')->name('assignments.')->group(function () {
-        Route::get('/', [TeacherCourseController::class, 'assignments'])->name('index');
-        Route::get('/create', [TeacherCourseController::class, 'createAssignment'])->name('create');
-        Route::post('/', [TeacherCourseController::class, 'storeAssignment'])->name('store');
-        Route::get('/{assignment}', [TeacherCourseController::class, 'showAssignment'])->name('show');
-        Route::get('/{assignment}/edit', [TeacherCourseController::class, 'editAssignment'])->name('edit');
-        Route::put('/{assignment}', [TeacherCourseController::class, 'updateAssignment'])->name('update');
-        Route::delete('/{assignment}', [TeacherCourseController::class, 'destroyAssignment'])->name('destroy');
-        Route::get('/{assignment}/submissions', [TeacherCourseController::class, 'submissions'])->name('submissions');
-        Route::post('/{submission}/grade', [TeacherCourseController::class, 'gradeSubmission'])->name('grade');
-    });
-    
-    // Notes / Grades
+    // Notation
     Route::prefix('grades')->name('grades.')->group(function () {
         Route::get('/', [TeacherGradeController::class, 'index'])->name('index');
-        Route::get('/class/{class}', [TeacherGradeController::class, 'byClass'])->name('by-class');
-        Route::get('/subject/{subject}', [TeacherGradeController::class, 'bySubject'])->name('by-subject');
-        Route::post('/', [TeacherGradeController::class, 'store'])->name('store');
+        Route::get('/{course}', [TeacherGradeController::class, 'show'])->name('show');
+        Route::post('/{enrollment}/grade', [TeacherGradeController::class, 'store'])->name('store');
         Route::put('/{grade}', [TeacherGradeController::class, 'update'])->name('update');
-        Route::delete('/{grade}', [TeacherGradeController::class, 'destroy'])->name('destroy');
-        Route::post('/bulk-update', [TeacherGradeController::class, 'bulkUpdate'])->name('bulk-update');
-        Route::get('/export', [TeacherGradeController::class, 'export'])->name('export');
     });
     
-    // Analytics / Statistiques
+    // Analytics
     Route::prefix('analytics')->name('analytics.')->group(function () {
         Route::get('/', [TeacherAnalyticsController::class, 'index'])->name('index');
-        Route::get('/engagement', [TeacherAnalyticsController::class, 'engagement'])->name('engagement');
-        Route::get('/attendance', [TeacherAnalyticsController::class, 'attendance'])->name('attendance');
-        Route::get('/performance', [TeacherAnalyticsController::class, 'performance'])->name('performance');
-        Route::get('/class/{class}', [TeacherAnalyticsController::class, 'byClass'])->name('by-class');
+        Route::get('/{course}', [TeacherAnalyticsController::class, 'show'])->name('show');
     });
     
-    // Enregistrements
-    Route::prefix('recordings')->name('recordings.')->group(function () {
-        Route::get('/', [TeacherRecordingController::class, 'index'])->name('index');
-        Route::get('/{recording}', [TeacherRecordingController::class, 'show'])->name('show');
-        Route::delete('/{recording}', [TeacherRecordingController::class, 'destroy'])->name('destroy');
-        Route::post('/{recording}/publish', [TeacherRecordingController::class, 'publish'])->name('publish');
-        Route::post('/{recording}/unpublish', [TeacherRecordingController::class, 'unpublish'])->name('unpublish');
+    // Gestion étudiants
+    Route::prefix('students')->name('students.')->group(function () {
+        Route::get('/', [TeacherStudentController::class, 'index'])->name('index');
+        Route::get('/{student}', [TeacherStudentController::class, 'show'])->name('show');
     });
     
-    // Messages (route spécifique enseignant)
-    Route::get('/messages', [TeacherMessageController::class, 'index'])->name('messages.index');
-    
-    // Profil
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [TeacherProfileController::class, 'index'])->name('index');
-        Route::get('/edit', [TeacherProfileController::class, 'edit'])->name('edit');
-        Route::put('/', [TeacherProfileController::class, 'update'])->name('update');
-        Route::put('/password', [TeacherProfileController::class, 'updatePassword'])->name('update-password');
-        Route::post('/avatar', [TeacherProfileController::class, 'updateAvatar'])->name('update-avatar');
+    // Messages
+    Route::prefix('messages')->name('messages.')->group(function () {
+        Route::get('/', [TeacherMessageController::class, 'index'])->name('index');
+        Route::get('/{message}', [TeacherMessageController::class, 'show'])->name('show');
     });
     
-    // Paramètres Live
-    Route::prefix('live-settings')->name('live-settings.')->group(function () {
-        Route::get('/', [TeacherCourseController::class, 'liveSettings'])->name('index');
-        Route::put('/', [TeacherCourseController::class, 'updateLiveSettings'])->name('update');
+    // Revenus
+    Route::prefix('earnings')->name('earnings.')->group(function () {
+        Route::get('/', [TeacherEarningController::class, 'index'])->name('index');
+        Route::get('/history', [TeacherEarningController::class, 'history'])->name('history');
+        Route::get('/export', [TeacherEarningController::class, 'export'])->name('export');
     });
     
-    // Objectifs pédagogiques
-    Route::prefix('objectives')->name('objectives.')->group(function () {
-        Route::get('/', [TeacherCourseController::class, 'objectives'])->name('index');
-        Route::post('/', [TeacherCourseController::class, 'storeObjective'])->name('store');
-        Route::put('/{objective}', [TeacherCourseController::class, 'updateObjective'])->name('update');
-        Route::delete('/{objective}', [TeacherCourseController::class, 'destroyObjective'])->name('destroy');
-    });
+    // Profil enseignant
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     
 });
 
 /*
 |--------------------------------------------------------------------------
-| Routes Espace Administrateur
+| Routes Administrateur
 |--------------------------------------------------------------------------
-|
-| Middleware: auth, verified, role:admin
-|
 */
 
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:admin'])->group(function () {
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     
-    // Gestion des utilisateurs
+    // Gestion utilisateurs
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [AdminUserController::class, 'index'])->name('index');
         Route::get('/create', [AdminUserController::class, 'create'])->name('create');
@@ -382,31 +370,25 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
         Route::get('/{user}/edit', [AdminUserController::class, 'edit'])->name('edit');
         Route::put('/{user}', [AdminUserController::class, 'update'])->name('update');
         Route::delete('/{user}', [AdminUserController::class, 'destroy'])->name('destroy');
-        
-        // Actions spécifiques
-        Route::post('/{user}/change-status', [AdminUserController::class, 'changeStatus'])->name('change-status');
-        Route::post('/{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('reset-password');
         Route::post('/{user}/impersonate', [AdminUserController::class, 'impersonate'])->name('impersonate');
-        Route::get('/export', [AdminUserController::class, 'export'])->name('export');
+        Route::post('/{user}/ban', [AdminUserController::class, 'ban'])->name('ban');
+        Route::post('/{user}/unban', [AdminUserController::class, 'unban'])->name('unban');
     });
     
-    // Gestion des formations
+    // Gestion formations
     Route::prefix('formations')->name('formations.')->group(function () {
         Route::get('/', [AdminFormationController::class, 'index'])->name('index');
-        Route::get('/create', [AdminFormationController::class, 'create'])->name('create');
-        Route::post('/', [AdminFormationController::class, 'store'])->name('store');
+        Route::get('/pending', [AdminFormationController::class, 'pending'])->name('pending');
+        Route::get('/analytics', [AdminFormationController::class, 'analytics'])->name('analytics');
         Route::get('/{formation}', [AdminFormationController::class, 'show'])->name('show');
         Route::get('/{formation}/edit', [AdminFormationController::class, 'edit'])->name('edit');
         Route::put('/{formation}', [AdminFormationController::class, 'update'])->name('update');
         Route::delete('/{formation}', [AdminFormationController::class, 'destroy'])->name('destroy');
-        
-        // Actions spécifiques
-        Route::post('/{formation}/publish', [AdminFormationController::class, 'publish'])->name('publish');
-        Route::post('/{formation}/unpublish', [AdminFormationController::class, 'unpublish'])->name('unpublish');
-        Route::post('/{formation}/duplicate', [AdminFormationController::class, 'duplicate'])->name('duplicate');
+        Route::post('/{formation}/approve', [AdminFormationController::class, 'approve'])->name('approve');
+        Route::post('/{formation}/reject', [AdminFormationController::class, 'reject'])->name('reject');
     });
     
-    // Gestion des classes
+    // Gestion classes
     Route::prefix('classes')->name('classes.')->group(function () {
         Route::get('/', [AdminClassController::class, 'index'])->name('index');
         Route::get('/create', [AdminClassController::class, 'create'])->name('create');
@@ -415,128 +397,105 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'role:ad
         Route::get('/{class}/edit', [AdminClassController::class, 'edit'])->name('edit');
         Route::put('/{class}', [AdminClassController::class, 'update'])->name('update');
         Route::delete('/{class}', [AdminClassController::class, 'destroy'])->name('destroy');
-        
-        // Actions spécifiques
         Route::get('/{class}/students', [AdminClassController::class, 'students'])->name('students');
         Route::post('/{class}/assign-students', [AdminClassController::class, 'assignStudents'])->name('assign-students');
-        Route::post('/{class}/auto-assign', [AdminClassController::class, 'autoAssignStudents'])->name('auto-assign');
-        Route::post('/{class}/assign-teacher', [AdminClassController::class, 'assignTeacher'])->name('assign-teacher');
-        Route::get('/{class}/schedule', [AdminClassController::class, 'schedule'])->name('schedule');
-        Route::post('/{class}/schedule', [AdminClassController::class, 'updateSchedule'])->name('update-schedule');
     });
     
-    // Gestion des enseignants
+    // Gestion enseignants
     Route::prefix('teachers')->name('teachers.')->group(function () {
         Route::get('/', [AdminTeacherController::class, 'index'])->name('index');
         Route::get('/pending', [AdminTeacherController::class, 'pending'])->name('pending');
         Route::get('/{teacher}', [AdminTeacherController::class, 'show'])->name('show');
-        
-        // Validation candidatures
         Route::post('/{teacher}/approve', [AdminTeacherController::class, 'approve'])->name('approve');
         Route::post('/{teacher}/reject', [AdminTeacherController::class, 'reject'])->name('reject');
-        Route::post('/{teacher}/suspend', [AdminTeacherController::class, 'suspend'])->name('suspend');
-        
-        // Assignments
-        Route::get('/{teacher}/classes', [AdminTeacherController::class, 'classes'])->name('classes');
-        Route::post('/{teacher}/assign-class', [AdminTeacherController::class, 'assignClass'])->name('assign-class');
     });
     
-    // Gestion des étudiants
+    // Gestion étudiants
     Route::prefix('students')->name('students.')->group(function () {
         Route::get('/', [AdminStudentController::class, 'index'])->name('index');
         Route::get('/{student}', [AdminStudentController::class, 'show'])->name('show');
         Route::get('/{student}/enrollments', [AdminStudentController::class, 'enrollments'])->name('enrollments');
-        Route::post('/{student}/enroll', [AdminStudentController::class, 'enroll'])->name('enroll');
-        Route::get('/{student}/grades', [AdminStudentController::class, 'grades'])->name('grades');
-        Route::get('/{student}/export', [AdminStudentController::class, 'exportData'])->name('export-data');
     });
     
-    // Gestion financière
-    Route::prefix('finances')->name('finances.')->group(function () {
-        Route::get('/', [AdminFinanceController::class, 'index'])->name('index');
-        Route::get('/payments', [AdminFinanceController::class, 'payments'])->name('payments');
-        Route::get('/payment/{payment}', [AdminFinanceController::class, 'showPayment'])->name('show-payment');
-        Route::post('/payment/{payment}/refund', [AdminFinanceController::class, 'refund'])->name('refund');
-        
-        // Rapports
-        Route::get('/reports', [AdminFinanceController::class, 'reports'])->name('reports');
-        Route::get('/reports/revenue', [AdminFinanceController::class, 'revenueReport'])->name('revenue-report');
-        Route::get('/reports/enrollments', [AdminFinanceController::class, 'enrollmentsReport'])->name('enrollments-report');
-        Route::get('/export-transactions', [AdminFinanceController::class, 'exportTransactions'])->name('export-transactions');
+    // Gestion paiements
+    Route::prefix('payments')->name('payments.')->group(function () {
+        Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
+        Route::get('/{payment}', [AdminPaymentController::class, 'show'])->name('show');
+        Route::post('/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('refund');
     });
     
-    // Système / Monitoring
-    Route::prefix('system')->name('system.')->group(function () {
-        Route::get('/', [AdminSystemController::class, 'index'])->name('index');
-        Route::get('/logs', [AdminSystemController::class, 'logs'])->name('logs');
-        Route::get('/logs/{file}', [AdminSystemController::class, 'viewLog'])->name('view-log');
-        
-        // Actions système
-        Route::post('/cache/clear', [AdminSystemController::class, 'clearCache'])->name('clear-cache');
-        Route::post('/optimize', [AdminSystemController::class, 'optimize'])->name('optimize');
-        Route::get('/backups', [AdminSystemController::class, 'backups'])->name('backups');
-        Route::post('/backup/create', [AdminSystemController::class, 'createBackup'])->name('create-backup');
-        Route::get('/backup/{backup}/download', [AdminSystemController::class, 'downloadBackup'])->name('download-backup');
-        Route::delete('/backup/{backup}', [AdminSystemController::class, 'deleteBackup'])->name('delete-backup');
-        
-        // Maintenance
-        Route::get('/maintenance', [AdminSystemController::class, 'maintenance'])->name('maintenance');
-        Route::post('/maintenance/enable', [AdminSystemController::class, 'enableMaintenance'])->name('enable-maintenance');
-        Route::post('/maintenance/disable', [AdminSystemController::class, 'disableMaintenance'])->name('disable-maintenance');
+    // Revenus
+    Route::prefix('revenue')->name('revenue.')->group(function () {
+        Route::get('/', [AdminRevenueController::class, 'index'])->name('index');
+        Route::get('/export', [AdminRevenueController::class, 'export'])->name('export');
+    });
+    
+    // Avis/Reviews
+    Route::prefix('reviews')->name('reviews.')->group(function () {
+        Route::get('/', [AdminReviewController::class, 'index'])->name('index');
+        Route::get('/flagged', [AdminReviewController::class, 'flagged'])->name('flagged');
+        Route::post('/{review}/approve', [AdminReviewController::class, 'approve'])->name('approve');
+        Route::delete('/{review}', [AdminReviewController::class, 'destroy'])->name('destroy');
+    });
+    
+    // Activités
+    Route::prefix('activity')->name('activity.')->group(function () {
+        Route::get('/', [AdminActivityController::class, 'index'])->name('index');
+        Route::get('/export', [AdminActivityController::class, 'export'])->name('export');
+    });
+    
+    // Rapports
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [AdminReportController::class, 'index'])->name('index');
+        Route::get('/revenue', [AdminReportController::class, 'revenue'])->name('revenue');
+        Route::get('/users', [AdminReportController::class, 'users'])->name('users');
+        Route::get('/courses', [AdminReportController::class, 'courses'])->name('courses');
+        Route::get('/attendance', [AdminReportController::class, 'attendance'])->name('attendance');
+    });
+    
+    // Support
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('/', [AdminSupportController::class, 'index'])->name('index');
+        Route::get('/{ticket}', [AdminSupportController::class, 'show'])->name('show');
+        Route::post('/{ticket}/assign', [AdminSupportController::class, 'assign'])->name('assign');
+        Route::post('/{ticket}/resolve', [AdminSupportController::class, 'resolve'])->name('resolve');
+    });
+    
+    // Demandes en attente
+    Route::prefix('requests')->name('requests.')->group(function () {
+        Route::get('/{request}', [AdminRequestController::class, 'show'])->name('show');
+        Route::post('/{request}/approve', [AdminRequestController::class, 'approve'])->name('approve');
+        Route::post('/{request}/reject', [AdminRequestController::class, 'reject'])->name('reject');
+    });
+    
+    // Alertes système
+    Route::prefix('alerts')->name('alerts.')->group(function () {
+        Route::post('/send', [AdminAlertController::class, 'send'])->name('send');
     });
     
     // Paramètres
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('/', [AdminSettingsController::class, 'index'])->name('index');
-        
-        // Paramètres généraux
-        Route::get('/general', [AdminSettingsController::class, 'general'])->name('general');
-        Route::post('/general', [AdminSettingsController::class, 'updateGeneral'])->name('update-general');
-        
-        // Paramètres email
-        Route::get('/email', [AdminSettingsController::class, 'email'])->name('email');
-        Route::post('/email', [AdminSettingsController::class, 'updateEmail'])->name('update-email');
-        Route::post('/email/test', [AdminSettingsController::class, 'testEmail'])->name('test-email');
-        
-        // Intégrations
-        Route::get('/integrations', [AdminSettingsController::class, 'integrations'])->name('integrations');
-        Route::post('/integrations', [AdminSettingsController::class, 'updateIntegrations'])->name('update-integrations');
-        Route::post('/integrations/zoom/test', [AdminSettingsController::class, 'testZoom'])->name('test-zoom');
-        Route::post('/integrations/stripe/test', [AdminSettingsController::class, 'testStripe'])->name('test-stripe');
-        
-        // Sécurité
-        Route::get('/security', [AdminSettingsController::class, 'security'])->name('security');
-        Route::post('/security', [AdminSettingsController::class, 'updateSecurity'])->name('update-security');
-        
-        // Notifications
-        Route::get('/notifications', [AdminSettingsController::class, 'notifications'])->name('notifications');
-        Route::post('/notifications', [AdminSettingsController::class, 'updateNotifications'])->name('update-notifications');
-        
-        // Inscriptions
-        Route::get('/enrollments', [AdminSettingsController::class, 'enrollments'])->name('enrollments');
-        Route::post('/enrollments', [AdminSettingsController::class, 'updateEnrollments'])->name('update-enrollments');
-        
-        // Paiements
-        Route::get('/payments', [AdminSettingsController::class, 'payments'])->name('payments');
-        Route::post('/payments', [AdminSettingsController::class, 'updatePayments'])->name('update-payments');
+        Route::get('/', [AdminSettingController::class, 'index'])->name('index');
+        Route::put('/', [AdminSettingController::class, 'update'])->name('update');
+        Route::get('/general', [AdminSettingController::class, 'general'])->name('general');
+        Route::get('/email', [AdminSettingController::class, 'email'])->name('email');
+        Route::get('/integrations', [AdminSettingController::class, 'integrations'])->name('integrations');
+        Route::get('/security', [AdminSettingController::class, 'security'])->name('security');
     });
     
-    // Rapports globaux
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', [AdminDashboardController::class, 'reports'])->name('index');
-        Route::get('/users', [AdminDashboardController::class, 'usersReport'])->name('users');
-        Route::get('/courses', [AdminDashboardController::class, 'coursesReport'])->name('courses');
-        Route::get('/attendance', [AdminDashboardController::class, 'attendanceReport'])->name('attendance');
+    // Système
+    Route::prefix('system')->name('system.')->group(function () {
+        Route::get('/', [AdminSystemController::class, 'index'])->name('index');
+        Route::get('/logs', [AdminSystemController::class, 'logs'])->name('logs');
+        Route::post('/cache/clear', [AdminSystemController::class, 'clearCache'])->name('clear-cache');
+        Route::post('/optimize', [AdminSystemController::class, 'optimize'])->name('optimize');
+        Route::get('/backups', [AdminSystemController::class, 'backups'])->name('backups');
+        Route::post('/backup/create', [AdminSystemController::class, 'createBackup'])->name('create-backup');
     });
     
 });
 
-/*
-|--------------------------------------------------------------------------
-| Routes de Stop Impersonation
-|--------------------------------------------------------------------------
-*/
-
+// Stop Impersonation (admin)
 Route::get('/stop-impersonating', [AdminUserController::class, 'stopImpersonating'])
     ->name('stop-impersonating')
     ->middleware('auth');
