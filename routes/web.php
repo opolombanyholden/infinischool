@@ -87,41 +87,85 @@ Route::get('/blog', [PageController::class, 'blog'])->name('blog');
 // Formations publiques
 Route::get('/formations', [FormationController::class, 'index'])->name('formations.index');
 Route::get('/formations/{slug}', [FormationController::class, 'show'])->name('formations.show');
+Route::get('/category/{category}', [FormationController::class, 'category'])->name('formations.category');
+Route::get('/search', [FormationController::class, 'search'])->name('formations.search');
 
 // Pages légales
 Route::get('/terms', [PageController::class, 'terms'])->name('terms');
 Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/legal', [PageController::class, 'legal'])->name('legal');
 
+// Vérification publique de certificat
+Route::get('/certificate/verify/{code}', [FormationController::class, 'verifyCertificate'])->name('certificate.verify');
+
 /*
 |--------------------------------------------------------------------------
-| Routes d'Authentification
+| Candidature Enseignant (routes publiques)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/devenir-enseignant', [TeacherController::class, 'apply'])->name('teacher.apply');
+Route::post('/devenir-enseignant', [TeacherController::class, 'submitApplication'])->name('teacher.apply.submit');
+
+/*
+|--------------------------------------------------------------------------
+| Routes d'Authentification (avec middleware guest)
 |--------------------------------------------------------------------------
 */
 
 // Connexion
-Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [LoginController::class, 'login']);
-Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::middleware(['guest'])->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+    
+    // Inscription
+    Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/register', [RegisterController::class, 'register']);
+    
+    // Mot de passe oublié
+    Route::get('/password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+    Route::post('/password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::get('/password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
+    
+    // OAuth Social Login
+    Route::get('/auth/{provider}', [SocialController::class, 'redirect'])->name('auth.social');
+    Route::get('/auth/{provider}/callback', [SocialController::class, 'callback']);
+});
 
-// Inscription
-Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-Route::post('/register', [RegisterController::class, 'register']);
+// Déconnexion (nécessite auth)
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('auth');
 
-// Mot de passe oublié
-Route::get('/password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
-Route::post('/password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
-Route::get('/password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
-Route::post('/password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
+// Vérification email (nécessite auth)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/email/verify', [VerificationController::class, 'show'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->name('verification.verify');
+    Route::post('/email/resend', [VerificationController::class, 'resend'])->name('verification.resend');
+});
 
-// Vérification email
-Route::get('/email/verify', [VerificationController::class, 'show'])->name('verification.notice');
-Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->name('verification.verify');
-Route::post('/email/resend', [VerificationController::class, 'resend'])->name('verification.resend');
+/*
+|--------------------------------------------------------------------------
+| Dashboard Générique (redirection selon rôle)
+|--------------------------------------------------------------------------
+*/
 
-// OAuth Social Login
-Route::get('/auth/{provider}', [SocialController::class, 'redirect'])->name('auth.social');
-Route::get('/auth/{provider}/callback', [SocialController::class, 'callback']);
+Route::get('/dashboard', function () {
+    $user = auth()->user();
+    
+    if (!$user) {
+        return redirect()->route('login');
+    }
+    
+    switch ($user->role) {
+        case 'admin':
+            return redirect()->route('admin.dashboard');
+        case 'teacher':
+            return redirect()->route('teacher.dashboard');
+        case 'student':
+        default:
+            return redirect()->route('student.dashboard');
+    }
+})->name('dashboard')->middleware('auth');
 
 /*
 |--------------------------------------------------------------------------
@@ -132,15 +176,18 @@ Route::get('/auth/{provider}/callback', [SocialController::class, 'callback']);
 Route::middleware(['auth'])->group(function () {
     
     // Profil utilisateur
-    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
-    Route::delete('/profile/avatar', [ProfileController::class, 'deleteAvatar'])->name('profile.avatar.delete');
-    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
-    Route::put('/profile/preferences', [ProfileController::class, 'updatePreferences'])->name('profile.preferences.update');
-    Route::post('/profile/2fa/enable', [ProfileController::class, 'enable2FA'])->name('profile.2fa.enable');
-    Route::delete('/profile/2fa/disable', [ProfileController::class, 'disable2FA'])->name('profile.2fa.disable');
-    Route::delete('/profile', [ProfileController::class, 'delete'])->name('profile.delete');
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'show'])->name('show');
+        Route::get('/edit', [ProfileController::class, 'edit'])->name('edit');
+        Route::put('/', [ProfileController::class, 'update'])->name('update');
+        Route::post('/avatar', [ProfileController::class, 'updateAvatar'])->name('avatar.update');
+        Route::delete('/avatar', [ProfileController::class, 'deleteAvatar'])->name('avatar.delete');
+        Route::put('/password', [ProfileController::class, 'updatePassword'])->name('password.update');
+        Route::put('/preferences', [ProfileController::class, 'updatePreferences'])->name('preferences.update');
+        Route::post('/2fa/enable', [ProfileController::class, 'enable2FA'])->name('2fa.enable');
+        Route::delete('/2fa/disable', [ProfileController::class, 'disable2FA'])->name('2fa.disable');
+        Route::delete('/', [ProfileController::class, 'delete'])->name('delete');
+    });
     
     // Messagerie (accessible à tous les rôles)
     Route::prefix('messages')->name('messages.')->group(function () {
@@ -162,8 +209,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
     
-    // Support (accessible à tous les rôles)
-    Route::prefix('support')->name('support.')->group(function () {
+    // Support/Aide utilisateur (renommé en "help" pour éviter conflit avec admin.support)
+    Route::prefix('help')->name('help.')->group(function () {
         Route::get('/', [SupportController::class, 'index'])->name('index');
         Route::get('/create', [SupportController::class, 'create'])->name('create');
         Route::post('/', [SupportController::class, 'store'])->name('store');
@@ -172,6 +219,24 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{ticket}/close', [SupportController::class, 'close'])->name('close');
     });
     
+});
+
+/*
+|--------------------------------------------------------------------------
+| Routes Inscription Formation (authentifiées)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/formations/{slug}/enroll', [EnrollmentController::class, 'create'])->name('formations.enroll');
+    Route::post('/formations/{slug}/enroll', [EnrollmentController::class, 'store'])->name('formations.enroll.store');
+    Route::post('/enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->name('enrollments.cancel');
+    
+    // Paiement
+    Route::get('/payment/checkout/{enrollment}', [EnrollmentController::class, 'checkout'])->name('payment.checkout');
+    Route::post('/payment/process/{enrollment}', [EnrollmentController::class, 'processPayment'])->name('payment.process');
+    Route::get('/payment/success/{enrollment}', [EnrollmentController::class, 'paymentSuccess'])->name('payment.success');
+    Route::get('/payment/cancel/{enrollment}', [EnrollmentController::class, 'paymentCancel'])->name('payment.cancel');
 });
 
 /*
@@ -246,18 +311,6 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
         Route::post('/{topic}/reply', [StudentCommunityController::class, 'reply'])->name('reply');
     });
     
-});
-
-/*
-|--------------------------------------------------------------------------
-| Routes Inscription Formation (authentifiées)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['auth'])->group(function () {
-    Route::get('/formations/{slug}/enroll', [EnrollmentController::class, 'create'])->name('formations.enroll');
-    Route::post('/formations/{slug}/enroll', [EnrollmentController::class, 'store'])->name('formations.enroll.store');
-    Route::post('/enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->name('enrollments.cancel');
 });
 
 /*
@@ -378,6 +431,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     // Gestion formations
     Route::prefix('formations')->name('formations.')->group(function () {
         Route::get('/', [AdminFormationController::class, 'index'])->name('index');
+        Route::get('/create', [AdminFormationController::class, 'create'])->name('create');
+        Route::post('/', [AdminFormationController::class, 'store'])->name('store');
         Route::get('/pending', [AdminFormationController::class, 'pending'])->name('pending');
         Route::get('/analytics', [AdminFormationController::class, 'analytics'])->name('analytics');
         Route::get('/{formation}', [AdminFormationController::class, 'show'])->name('show');
@@ -453,7 +508,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/attendance', [AdminReportController::class, 'attendance'])->name('attendance');
     });
     
-    // Support
+    // Support Admin
     Route::prefix('support')->name('support.')->group(function () {
         Route::get('/', [AdminSupportController::class, 'index'])->name('index');
         Route::get('/{ticket}', [AdminSupportController::class, 'show'])->name('show');
@@ -463,6 +518,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     
     // Demandes en attente
     Route::prefix('requests')->name('requests.')->group(function () {
+        Route::get('/', [AdminRequestController::class, 'index'])->name('index');
         Route::get('/{request}', [AdminRequestController::class, 'show'])->name('show');
         Route::post('/{request}/approve', [AdminRequestController::class, 'approve'])->name('approve');
         Route::post('/{request}/reject', [AdminRequestController::class, 'reject'])->name('reject');
@@ -470,6 +526,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     
     // Alertes système
     Route::prefix('alerts')->name('alerts.')->group(function () {
+        Route::get('/', [AdminAlertController::class, 'index'])->name('index');
         Route::post('/send', [AdminAlertController::class, 'send'])->name('send');
     });
     
