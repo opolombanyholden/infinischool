@@ -36,17 +36,17 @@ class AdminUserController extends Controller
     public function index(Request $request): View
     {
         $query = User::query();
-        
+
         // Filtre par rôle
         if ($request->filled('role')) {
             $query->where('role', $request->role);
         }
-        
+
         // Filtre par statut
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        
+
         // Filtre par date d'inscription
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
@@ -54,26 +54,26 @@ class AdminUserController extends Controller
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
-        
+
         // Recherche multi-critères
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
-        
+
         // Tri
         $sortBy = $request->input('sort_by', 'created_at');
         $sortOrder = $request->input('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
-        
+
         // Pagination
         $perPage = $request->input('per_page', 25);
         $users = $query->paginate($perPage)->withQueryString();
-        
+
         // Statistiques globales
         $stats = [
             'total' => User::count(),
@@ -84,10 +84,10 @@ class AdminUserController extends Controller
             'pending' => User::where('status', 'pending')->count(),
             'suspended' => User::where('status', 'suspended')->count(),
         ];
-        
+
         return view('admin.users.index', compact('users', 'stats'));
     }
-    
+
     /**
      * Affiche le formulaire de création d'utilisateur
      * 
@@ -97,7 +97,7 @@ class AdminUserController extends Controller
     {
         return view('admin.users.create');
     }
-    
+
     /**
      * Enregistre un nouvel utilisateur
      * 
@@ -120,27 +120,27 @@ class AdminUserController extends Controller
             'country' => 'nullable|string|max:100',
             'date_of_birth' => 'nullable|date|before:today',
         ]);
-        
+
         // Upload avatar si présent
         if ($request->hasFile('avatar')) {
             $validated['avatar'] = $request->file('avatar')
                 ->store('avatars', 'public');
         }
-        
+
         // Hash du mot de passe
         $validated['password'] = Hash::make($validated['password']);
-        
+
         // Créer l'utilisateur
         $user = User::create($validated);
-        
+
         // TODO: Envoyer email de bienvenue
         // Mail::to($user->email)->send(new WelcomeEmail($user));
-        
+
         return redirect()
             ->route('admin.users.show', $user)
             ->with('success', 'Utilisateur créé avec succès !');
     }
-    
+
     /**
      * Affiche les détails d'un utilisateur
      * 
@@ -151,16 +151,16 @@ class AdminUserController extends Controller
     {
         // Statistiques de l'utilisateur
         $stats = $this->getUserStats($user);
-        
+
         // Activité récente
         $recentActivity = $this->getUserActivity($user, 10);
-        
+
         // Données spécifiques selon le rôle
         $roleData = $this->getRoleSpecificData($user);
-        
+
         return view('admin.users.show', compact('user', 'stats', 'recentActivity', 'roleData'));
     }
-    
+
     /**
      * Affiche le formulaire d'édition d'utilisateur
      * 
@@ -171,7 +171,7 @@ class AdminUserController extends Controller
     {
         return view('admin.users.edit', compact('user'));
     }
-    
+
     /**
      * Met à jour un utilisateur
      * 
@@ -195,7 +195,7 @@ class AdminUserController extends Controller
             'country' => 'nullable|string|max:100',
             'date_of_birth' => 'nullable|date|before:today',
         ]);
-        
+
         // Upload avatar si présent
         if ($request->hasFile('avatar')) {
             // Supprimer l'ancien avatar
@@ -205,22 +205,22 @@ class AdminUserController extends Controller
             $validated['avatar'] = $request->file('avatar')
                 ->store('avatars', 'public');
         }
-        
+
         // Hash du mot de passe si modifié
         if ($request->filled('password')) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
         }
-        
+
         // Mise à jour
         $user->update($validated);
-        
+
         return redirect()
             ->route('admin.users.show', $user)
             ->with('success', 'Utilisateur mis à jour avec succès !');
     }
-    
+
     /**
      * Supprime un utilisateur
      * 
@@ -235,45 +235,45 @@ class AdminUserController extends Controller
                 ->route('admin.users.index')
                 ->with('error', 'Vous ne pouvez pas supprimer votre propre compte !');
         }
-        
+
         // TODO: Gérer les contraintes d'intégrité (cascade ou soft delete)
         // Pour l'instant, on vérifie juste qu'il n'a pas de cours actifs
         if ($user->role === 'teacher') {
             $activeCourses = Course::where('teacher_id', $user->id)
                 ->where('status', 'scheduled')
                 ->count();
-            
+
             if ($activeCourses > 0) {
                 return redirect()
                     ->route('admin.users.show', $user)
                     ->with('error', "Impossible de supprimer : cet enseignant a {$activeCourses} cours programmés.");
             }
         }
-        
+
         if ($user->role === 'student') {
             $activeEnrollments = Enrollment::where('user_id', $user->id)
                 ->where('status', 'active')
                 ->count();
-            
+
             if ($activeEnrollments > 0) {
                 return redirect()
                     ->route('admin.users.show', $user)
                     ->with('error', "Impossible de supprimer : cet étudiant a {$activeEnrollments} inscriptions actives.");
             }
         }
-        
+
         // Supprimer l'avatar
         if ($user->avatar) {
             \Storage::disk('public')->delete($user->avatar);
         }
-        
+
         $user->delete();
-        
+
         return redirect()
             ->route('admin.users.index')
             ->with('success', 'Utilisateur supprimé avec succès !');
     }
-    
+
     /**
      * Suspend un utilisateur
      * 
@@ -283,14 +283,14 @@ class AdminUserController extends Controller
     public function suspend(User $user): RedirectResponse
     {
         $user->update(['status' => 'suspended']);
-        
+
         // TODO: Envoyer notification à l'utilisateur
-        
+
         return redirect()
             ->back()
             ->with('success', 'Utilisateur suspendu avec succès !');
     }
-    
+
     /**
      * Active un utilisateur
      * 
@@ -300,14 +300,14 @@ class AdminUserController extends Controller
     public function activate(User $user): RedirectResponse
     {
         $user->update(['status' => 'active']);
-        
+
         // TODO: Envoyer notification à l'utilisateur
-        
+
         return redirect()
             ->back()
             ->with('success', 'Utilisateur activé avec succès !');
     }
-    
+
     /**
      * Bannit un utilisateur
      * 
@@ -317,14 +317,14 @@ class AdminUserController extends Controller
     public function ban(User $user): RedirectResponse
     {
         $user->update(['status' => 'banned']);
-        
+
         // TODO: Envoyer notification à l'utilisateur
-        
+
         return redirect()
             ->back()
             ->with('success', 'Utilisateur banni avec succès !');
     }
-    
+
     /**
      * Actions en masse sur les utilisateurs
      * 
@@ -338,10 +338,10 @@ class AdminUserController extends Controller
             'user_ids' => 'required|array',
             'user_ids.*' => 'exists:users,id',
         ]);
-        
+
         $userIds = $validated['user_ids'];
         $action = $validated['action'];
-        
+
         // Empêcher l'action sur son propre compte
         if (in_array(auth()->id(), $userIds)) {
             return response()->json([
@@ -349,50 +349,50 @@ class AdminUserController extends Controller
                 'message' => 'Vous ne pouvez pas effectuer cette action sur votre propre compte !',
             ], 422);
         }
-        
+
         DB::beginTransaction();
-        
+
         try {
             switch ($action) {
                 case 'activate':
                     User::whereIn('id', $userIds)->update(['status' => 'active']);
                     $message = count($userIds) . ' utilisateur(s) activé(s)';
                     break;
-                    
+
                 case 'suspend':
                     User::whereIn('id', $userIds)->update(['status' => 'suspended']);
                     $message = count($userIds) . ' utilisateur(s) suspendu(s)';
                     break;
-                    
+
                 case 'ban':
                     User::whereIn('id', $userIds)->update(['status' => 'banned']);
                     $message = count($userIds) . ' utilisateur(s) banni(s)';
                     break;
-                    
+
                 case 'delete':
                     // TODO: Vérifier les contraintes avant suppression
                     User::whereIn('id', $userIds)->delete();
                     $message = count($userIds) . ' utilisateur(s) supprimé(s)';
                     break;
             }
-            
+
             DB::commit();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => $message,
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'action : ' . $e->getMessage(),
             ], 500);
         }
     }
-    
+
     /**
      * Export des utilisateurs en CSV
      * 
@@ -402,7 +402,7 @@ class AdminUserController extends Controller
     public function export(Request $request)
     {
         $query = User::query();
-        
+
         // Appliquer les mêmes filtres que l'index
         if ($request->filled('role')) {
             $query->where('role', $request->role);
@@ -410,20 +410,20 @@ class AdminUserController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        
+
         $users = $query->get();
-        
+
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="users-' . date('Y-m-d') . '.csv"',
         ];
-        
-        $callback = function() use ($users) {
+
+        $callback = function () use ($users) {
             $file = fopen('php://output', 'w');
-            
+
             // En-têtes CSV
             fputcsv($file, ['ID', 'Nom', 'Email', 'Téléphone', 'Rôle', 'Statut', 'Date d\'inscription']);
-            
+
             // Données
             foreach ($users as $user) {
                 fputcsv($file, [
@@ -436,13 +436,13 @@ class AdminUserController extends Controller
                     $user->created_at->format('Y-m-d H:i:s'),
                 ]);
             }
-            
+
             fclose($file);
         };
-        
+
         return response()->stream($callback, 200, $headers);
     }
-    
+
     /**
      * Import des utilisateurs depuis CSV
      * 
@@ -454,24 +454,24 @@ class AdminUserController extends Controller
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|mimes:csv,txt',
         ]);
-        
+
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator);
         }
-        
+
         try {
             // TODO: Implémenter l'import avec Laravel Excel ou traitement manuel
             // Excel::import(new UsersImport, $request->file('file'));
-            
+
             return redirect()->route('admin.users.index')
                 ->with('success', 'Import effectué avec succès !');
-                
+
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Erreur lors de l\'import : ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Récupère les statistiques d'un utilisateur
      * 
@@ -487,7 +487,7 @@ class AdminUserController extends Controller
                 ->where('user_id', $user->id)
                 ->count(),
         ];
-        
+
         // Statistiques selon le rôle
         switch ($user->role) {
             case 'student':
@@ -500,7 +500,7 @@ class AdminUserController extends Controller
                     ->where('user_id', $user->id)
                     ->avg('grade') ?? 0;
                 break;
-                
+
             case 'teacher':
                 $stats['classes'] = DB::table('class_teacher')
                     ->where('teacher_id', $user->id)
@@ -515,10 +515,10 @@ class AdminUserController extends Controller
                     ->count('enrollments.user_id');
                 break;
         }
-        
+
         return $stats;
     }
-    
+
     /**
      * Récupère l'activité récente d'un utilisateur
      * 
@@ -531,7 +531,7 @@ class AdminUserController extends Controller
         // TODO: Implémenter avec une table activity_logs
         return [];
     }
-    
+
     /**
      * Récupère les données spécifiques au rôle
      * 
@@ -541,7 +541,7 @@ class AdminUserController extends Controller
     private function getRoleSpecificData(User $user): array
     {
         $data = [];
-        
+
         switch ($user->role) {
             case 'student':
                 $data['enrollments'] = Enrollment::with('formation')
@@ -554,7 +554,7 @@ class AdminUserController extends Controller
                     ->limit(5)
                     ->get();
                 break;
-                
+
             case 'teacher':
                 $data['courses'] = Course::with('subject')
                     ->where('teacher_id', $user->id)
@@ -567,7 +567,131 @@ class AdminUserController extends Controller
                     ->get();
                 break;
         }
-        
+
         return $data;
+    }
+
+    // ============================================
+    // GESTION DES INSCRIPTIONS EN ATTENTE
+    // ============================================
+
+    /**
+     * Affiche la liste des inscriptions en attente de validation
+     * 
+     * @param Request $request
+     * @return View
+     */
+    public function pendingRegistrations(Request $request): View
+    {
+        $query = User::where('registration_status', 'pending')
+            ->where('role', 'student')
+            ->with('desiredFormation');
+
+        // Filtre par formation
+        if ($request->filled('formation_id')) {
+            $query->where('desired_formation_id', $request->formation_id);
+        }
+
+        // Recherche par nom/email
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('student_number', 'like', "%{$search}%");
+            });
+        }
+
+        // Tri par date d'inscription (plus anciennes d'abord par défaut)
+        $query->orderBy('created_at', 'asc');
+
+        $pendingUsers = $query->paginate(20)->withQueryString();
+
+        // Récupérer les formations pour le filtre
+        $formations = \App\Models\Formation::published()->orderBy('title')->get();
+
+        // Statistiques
+        $stats = [
+            'total_pending' => User::where('registration_status', 'pending')->where('role', 'student')->count(),
+            'email_verified' => User::where('registration_status', 'pending')
+                ->where('role', 'student')
+                ->whereNotNull('email_verified_at')
+                ->count(),
+            'email_not_verified' => User::where('registration_status', 'pending')
+                ->where('role', 'student')
+                ->whereNull('email_verified_at')
+                ->count(),
+            'today' => User::where('registration_status', 'pending')
+                ->where('role', 'student')
+                ->whereDate('created_at', today())
+                ->count(),
+        ];
+
+        return view('admin.users.pending-registrations', compact('pendingUsers', 'formations', 'stats'));
+    }
+
+    /**
+     * Approuve une inscription étudiant
+     * 
+     * @param User $user
+     * @return RedirectResponse
+     */
+    public function approveRegistration(User $user): RedirectResponse
+    {
+        // Vérifier que c'est bien une inscription en attente
+        if ($user->registration_status !== 'pending') {
+            return redirect()->back()
+                ->with('error', 'Cette inscription n\'est pas en attente de validation.');
+        }
+
+        // Mettre à jour le statut
+        $user->update([
+            'registration_status' => 'approved',
+            'status' => 'active',
+            'approved_at' => now(),
+            'approved_by' => auth()->id(),
+        ]);
+
+        // Envoyer la notification d'approbation
+        $user->notify(new \App\Notifications\RegistrationApproved());
+
+        return redirect()->back()
+            ->with('success', "L'inscription de {$user->name} a été validée avec succès !");
+    }
+
+    /**
+     * Rejette une inscription étudiant
+     * 
+     * @param Request $request
+     * @param User $user
+     * @return RedirectResponse
+     */
+    public function rejectRegistration(Request $request, User $user): RedirectResponse
+    {
+        // Vérifier que c'est bien une inscription en attente
+        if ($user->registration_status !== 'pending') {
+            return redirect()->back()
+                ->with('error', 'Cette inscription n\'est pas en attente de validation.');
+        }
+
+        // Valider la raison
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:500',
+        ], [
+            'rejection_reason.required' => 'Veuillez indiquer une raison pour le refus.',
+        ]);
+
+        // Mettre à jour le statut
+        $user->update([
+            'registration_status' => 'rejected',
+            'status' => 'inactive',
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        // Envoyer la notification de refus
+        $user->notify(new \App\Notifications\RegistrationRejected($validated['rejection_reason']));
+
+        return redirect()->back()
+            ->with('success', "L'inscription de {$user->name} a été refusée.");
     }
 }

@@ -11,11 +11,11 @@
 
 <!-- Social Login -->
 <div class="social-login">
-    <a href="{{ route('auth.google') }}" class="btn-social btn-google">
+    <a href="{{ route('auth.social', 'google') }}" class="btn-social btn-google">
         <i class="fab fa-google"></i>
         <span>Google</span>
     </a>
-    <a href="{{ route('auth.linkedin') }}" class="btn-social btn-linkedin">
+    <a href="{{ route('auth.social', 'linkedin') }}" class="btn-social btn-linkedin">
         <i class="fab fa-linkedin"></i>
         <span>LinkedIn</span>
     </a>

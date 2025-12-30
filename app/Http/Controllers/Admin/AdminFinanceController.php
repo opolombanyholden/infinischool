@@ -36,37 +36,37 @@ class AdminFinanceController extends Controller
         $period = $request->input('period', 'month');
         $startDate = $this->getPeriodStartDate($period);
         $endDate = Carbon::now();
-        
+
         // KPIs financiers
         $kpis = $this->getFinancialKPIs($startDate, $endDate);
-        
+
         // Évolution du CA (graphique)
         $revenueEvolution = $this->getRevenueEvolution($startDate, $endDate);
-        
+
         // Top formations par revenus
         $topFormations = $this->getTopFormationsByRevenue(5);
-        
+
         // Paiements récents
         $recentPayments = Payment::with(['student', 'formation'])
             ->latest()
             ->limit(10)
             ->get();
-        
+
         // Paiements en attente
         $pendingPayments = Payment::where('status', 'pending')
             ->with(['student', 'formation'])
             ->latest()
             ->limit(10)
             ->get();
-        
+
         // Paiements échoués (aujourd'hui)
         $failedPaymentsToday = Payment::where('status', 'failed')
             ->whereDate('created_at', Carbon::today())
             ->count();
-        
+
         // Statistiques par méthode de paiement
         $paymentMethods = $this->getPaymentMethodsStats();
-        
+
         return view('admin.finance.index', compact(
             'kpis',
             'revenueEvolution',
@@ -78,7 +78,7 @@ class AdminFinanceController extends Controller
             'period'
         ));
     }
-    
+
     /**
      * Affiche la liste des paiements avec filtres
      * 
@@ -88,22 +88,22 @@ class AdminFinanceController extends Controller
     public function payments(Request $request): View
     {
         $query = Payment::with(['student', 'formation', 'enrollment']);
-        
+
         // Filtre par statut
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-        
+
         // Filtre par méthode de paiement
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->payment_method);
         }
-        
+
         // Filtre par formation
         if ($request->filled('formation_id')) {
             $query->where('formation_id', $request->formation_id);
         }
-        
+
         // Filtre par période
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
@@ -111,7 +111,7 @@ class AdminFinanceController extends Controller
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
-        
+
         // Filtre par montant
         if ($request->filled('amount_min')) {
             $query->where('amount', '>=', $request->amount_min);
@@ -119,28 +119,28 @@ class AdminFinanceController extends Controller
         if ($request->filled('amount_max')) {
             $query->where('amount', '<=', $request->amount_max);
         }
-        
+
         // Recherche par transaction ID ou nom étudiant
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('transaction_id', 'like', "%{$search}%")
-                  ->orWhereHas('student', function ($sq) use ($search) {
-                      $sq->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('student', function ($sq) use ($search) {
+                        $sq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
             });
         }
-        
+
         // Tri
         $sortBy = $request->input('sort_by', 'created_at');
         $sortOrder = $request->input('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
-        
+
         // Pagination
         $perPage = $request->input('per_page', 25);
         $payments = $query->paginate($perPage)->withQueryString();
-        
+
         // Statistiques pour la page
         $stats = [
             'total' => Payment::count(),
@@ -151,13 +151,13 @@ class AdminFinanceController extends Controller
             'total_amount' => Payment::where('status', 'completed')->sum('amount'),
             'pending_amount' => Payment::where('status', 'pending')->sum('amount'),
         ];
-        
+
         // Formations pour le filtre
         $formations = Formation::orderBy('name')->get();
-        
+
         return view('admin.finance.payments', compact('payments', 'stats', 'formations'));
     }
-    
+
     /**
      * Affiche les détails d'un paiement
      * 
@@ -167,13 +167,13 @@ class AdminFinanceController extends Controller
     public function showPayment(Payment $payment): View
     {
         $payment->load(['student', 'formation', 'enrollment']);
-        
+
         // Historique des tentatives (si table exists)
         // $paymentAttempts = PaymentAttempt::where('payment_id', $payment->id)->get();
-        
+
         return view('admin.finance.payment-details', compact('payment'));
     }
-    
+
     /**
      * Marque un paiement comme complété manuellement
      * 
@@ -187,25 +187,25 @@ class AdminFinanceController extends Controller
                 ->back()
                 ->with('warning', 'Ce paiement est déjà marqué comme complété.');
         }
-        
+
         $payment->update([
             'status' => 'completed',
             'paid_at' => now(),
         ]);
-        
+
         // Activer l'inscription
         if ($payment->enrollment_id) {
             Enrollment::where('id', $payment->enrollment_id)
                 ->update(['status' => 'active']);
         }
-        
+
         // TODO: Envoyer email de confirmation
-        
+
         return redirect()
             ->back()
             ->with('success', 'Paiement marqué comme complété avec succès !');
     }
-    
+
     /**
      * Traite un remboursement
      * 
@@ -219,17 +219,17 @@ class AdminFinanceController extends Controller
             'reason' => 'required|string|max:1000',
             'refund_amount' => 'nullable|numeric|min:0|max:' . $payment->amount,
         ]);
-        
+
         if ($payment->status !== 'completed') {
             return redirect()
                 ->back()
                 ->with('error', 'Seuls les paiements complétés peuvent être remboursés.');
         }
-        
+
         $refundAmount = $validated['refund_amount'] ?? $payment->amount;
-        
+
         DB::beginTransaction();
-        
+
         try {
             // Mettre à jour le paiement
             $payment->update([
@@ -238,33 +238,33 @@ class AdminFinanceController extends Controller
                 'refund_amount' => $refundAmount,
                 'refunded_at' => now(),
             ]);
-            
+
             // Suspendre l'inscription si remboursement total
             if ($refundAmount == $payment->amount && $payment->enrollment_id) {
                 Enrollment::where('id', $payment->enrollment_id)
                     ->update(['status' => 'cancelled']);
             }
-            
+
             // TODO: Traiter le remboursement via Stripe/PayPal
             // Stripe::refund($payment->transaction_id, $refundAmount);
-            
+
             // TODO: Envoyer email de confirmation de remboursement
-            
+
             DB::commit();
-            
+
             return redirect()
                 ->back()
                 ->with('success', "Remboursement de {$refundAmount}€ effectué avec succès !");
-                
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return redirect()
                 ->back()
                 ->with('error', 'Erreur lors du remboursement : ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Affiche les paiements échoués
      * 
@@ -276,7 +276,7 @@ class AdminFinanceController extends Controller
             ->with(['student', 'formation'])
             ->latest()
             ->paginate(25);
-        
+
         $stats = [
             'total_failed' => Payment::where('status', 'failed')->count(),
             'failed_today' => Payment::where('status', 'failed')
@@ -284,10 +284,10 @@ class AdminFinanceController extends Controller
                 ->count(),
             'lost_revenue' => Payment::where('status', 'failed')->sum('amount'),
         ];
-        
+
         return view('admin.finance.failed-payments', compact('failedPayments', 'stats'));
     }
-    
+
     /**
      * Réessaie un paiement échoué
      * 
@@ -301,22 +301,22 @@ class AdminFinanceController extends Controller
                 ->back()
                 ->with('error', 'Ce paiement n\'est pas en échec.');
         }
-        
+
         // TODO: Implémenter la logique de retry avec Stripe/PayPal
         // $result = Stripe::retryPayment($payment->transaction_id);
-        
+
         $payment->update([
             'status' => 'pending',
             'notes' => ($payment->notes ?? '') . "\n[" . now() . "] Tentative de paiement relancée",
         ]);
-        
+
         // TODO: Envoyer email à l'étudiant pour compléter le paiement
-        
+
         return redirect()
             ->back()
             ->with('success', 'Demande de paiement relancée !');
     }
-    
+
     /**
      * Affiche les revenus par formation
      * 
@@ -328,7 +328,7 @@ class AdminFinanceController extends Controller
         // Période
         $period = $request->input('period', 'all');
         $startDate = $period !== 'all' ? $this->getPeriodStartDate($period) : null;
-        
+
         // Requête
         $query = DB::table('payments')
             ->join('formations', 'payments.formation_id', '=', 'formations.id')
@@ -345,23 +345,23 @@ class AdminFinanceController extends Controller
             )
             ->groupBy('formations.id', 'formations.name', 'formations.code')
             ->orderByDesc('total_revenue');
-        
+
         if ($startDate) {
             $query->where('payments.paid_at', '>=', $startDate);
         }
-        
+
         $revenueByFormation = $query->get();
-        
+
         // Total global
         $totalRevenue = $revenueByFormation->sum('total_revenue');
-        
+
         return view('admin.finance.revenue-by-formation', compact(
             'revenueByFormation',
             'totalRevenue',
             'period'
         ));
     }
-    
+
     /**
      * Génère un rapport financier
      * 
@@ -375,29 +375,29 @@ class AdminFinanceController extends Controller
             'end_date' => 'required|date|after:start_date',
             'format' => 'required|in:view,csv,pdf',
         ]);
-        
+
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
-        
+
         // Données du rapport
         $reportData = $this->generateReportData($startDate, $endDate);
-        
+
         // Format de sortie
         switch ($validated['format']) {
             case 'csv':
                 return $this->exportReportAsCSV($reportData, $startDate, $endDate);
-                
+
             case 'pdf':
                 // TODO: Implémenter avec DomPDF
                 return redirect()
                     ->back()
                     ->with('info', 'Export PDF en développement.');
-                
+
             default: // view
                 return view('admin.finance.report', compact('reportData', 'startDate', 'endDate'));
         }
     }
-    
+
     /**
      * Affiche les statistiques de conversion
      * 
@@ -408,36 +408,36 @@ class AdminFinanceController extends Controller
     {
         $period = $request->input('period', 'month');
         $startDate = $this->getPeriodStartDate($period);
-        
+
         // Visiteurs (TODO: intégrer avec Google Analytics)
         $totalVisitors = 10000; // Placeholder
-        
+
         // Inscriptions
         $totalEnrollments = Enrollment::where('created_at', '>=', $startDate)->count();
-        
+
         // Paiements
         $completedPayments = Payment::where('status', 'completed')
             ->where('paid_at', '>=', $startDate)
             ->count();
-        
+
         $pendingPayments = Payment::where('status', 'pending')
             ->where('created_at', '>=', $startDate)
             ->count();
-        
+
         $failedPayments = Payment::where('status', 'failed')
             ->where('created_at', '>=', $startDate)
             ->count();
-        
+
         // Calculs
         $enrollmentRate = $totalVisitors > 0 ? ($totalEnrollments / $totalVisitors) * 100 : 0;
         $paymentRate = $totalEnrollments > 0 ? ($completedPayments / $totalEnrollments) * 100 : 0;
-        $failureRate = ($completedPayments + $failedPayments) > 0 
-            ? ($failedPayments / ($completedPayments + $failedPayments)) * 100 
+        $failureRate = ($completedPayments + $failedPayments) > 0
+            ? ($failedPayments / ($completedPayments + $failedPayments)) * 100
             : 0;
-        
+
         // Évolution du taux de conversion
         $conversionEvolution = $this->getConversionEvolution($startDate);
-        
+
         $stats = [
             'visitors' => $totalVisitors,
             'enrollments' => $totalEnrollments,
@@ -448,10 +448,10 @@ class AdminFinanceController extends Controller
             'payment_rate' => round($paymentRate, 2),
             'failure_rate' => round($failureRate, 2),
         ];
-        
+
         return view('admin.finance.conversion', compact('stats', 'conversionEvolution', 'period'));
     }
-    
+
     /**
      * Récupère les KPIs financiers
      * 
@@ -465,38 +465,38 @@ class AdminFinanceController extends Controller
         $completedRevenue = Payment::where('status', 'completed')
             ->whereBetween('paid_at', [$startDate, $endDate])
             ->sum('amount');
-        
+
         // Revenus en attente
         $pendingRevenue = Payment::where('status', 'pending')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum('amount');
-        
+
         // Revenus remboursés
         $refundedRevenue = Payment::where('status', 'refunded')
-            ->whereBetween('refunded_at', [$startDate, $endDate])
-            ->sum('refund_amount');
-        
+            ->whereBetween('updated_at', [$startDate, $endDate])
+            ->sum('amount');
+
         // Nombre de transactions
         $transactionsCount = Payment::where('status', 'completed')
             ->whereBetween('paid_at', [$startDate, $endDate])
             ->count();
-        
+
         // Panier moyen
         $avgBasket = $transactionsCount > 0 ? $completedRevenue / $transactionsCount : 0;
-        
+
         // Croissance vs période précédente
         $previousPeriodStart = $startDate->copy()->sub($endDate->diff($startDate));
         $previousRevenue = Payment::where('status', 'completed')
             ->whereBetween('paid_at', [$previousPeriodStart, $startDate])
             ->sum('amount');
-        
-        $growth = $previousRevenue > 0 
-            ? (($completedRevenue - $previousRevenue) / $previousRevenue) * 100 
+
+        $growth = $previousRevenue > 0
+            ? (($completedRevenue - $previousRevenue) / $previousRevenue) * 100
             : 0;
-        
+
         // CA total (all time)
         $totalRevenue = Payment::where('status', 'completed')->sum('amount');
-        
+
         return [
             'completed_revenue' => round($completedRevenue, 2),
             'pending_revenue' => round($pendingRevenue, 2),
@@ -509,7 +509,7 @@ class AdminFinanceController extends Controller
             'currency' => 'EUR',
         ];
     }
-    
+
     /**
      * Récupère l'évolution des revenus
      * 
@@ -525,14 +525,14 @@ class AdminFinanceController extends Controller
             ->groupBy('date')
             ->orderBy('date')
             ->get();
-        
+
         return [
             'labels' => $data->pluck('date')->map(fn($d) => Carbon::parse($d)->format('d/m'))->toArray(),
             'revenue' => $data->pluck('revenue')->map(fn($r) => round($r, 2))->toArray(),
             'transactions' => $data->pluck('transactions')->toArray(),
         ];
     }
-    
+
     /**
      * Récupère le top formations par revenus
      * 
@@ -555,7 +555,7 @@ class AdminFinanceController extends Controller
             ->limit($limit)
             ->get();
     }
-    
+
     /**
      * Récupère les stats par méthode de paiement
      * 
@@ -577,7 +577,7 @@ class AdminFinanceController extends Controller
             })
             ->toArray();
     }
-    
+
     /**
      * Récupère la date de début selon la période
      * 
@@ -601,7 +601,7 @@ class AdminFinanceController extends Controller
                 return Carbon::now()->startOfMonth();
         }
     }
-    
+
     /**
      * Génère les données du rapport
      * 
@@ -619,7 +619,7 @@ class AdminFinanceController extends Controller
             'refunds' => $this->getRefundsData($startDate, $endDate),
         ];
     }
-    
+
     /**
      * Récupère les revenus par formation pour une période
      * 
@@ -643,7 +643,7 @@ class AdminFinanceController extends Controller
             ->get()
             ->toArray();
     }
-    
+
     /**
      * Récupère les données de remboursement
      * 
@@ -656,14 +656,14 @@ class AdminFinanceController extends Controller
         $refunds = Payment::where('status', 'refunded')
             ->whereBetween('refunded_at', [$startDate, $endDate])
             ->get();
-        
+
         return [
             'count' => $refunds->count(),
-            'total_amount' => round($refunds->sum('refund_amount'), 2),
-            'avg_amount' => round($refunds->avg('refund_amount'), 2),
+            'total_amount' => round($refunds->sum('amount'), 2),
+            'avg_amount' => round($refunds->avg('amount'), 2),
         ];
     }
-    
+
     /**
      * Exporte le rapport en CSV
      * 
@@ -675,20 +675,20 @@ class AdminFinanceController extends Controller
     private function exportReportAsCSV(array $data, Carbon $startDate, Carbon $endDate)
     {
         $filename = "rapport-financier-{$startDate->format('Y-m-d')}-{$endDate->format('Y-m-d')}.csv";
-        
+
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
-        
-        $callback = function() use ($data, $startDate, $endDate) {
+
+        $callback = function () use ($data, $startDate, $endDate) {
             $file = fopen('php://output', 'w');
-            
+
             // En-tête du rapport
             fputcsv($file, ['Rapport Financier InfiniSchool']);
             fputcsv($file, ['Période', $startDate->format('d/m/Y') . ' - ' . $endDate->format('d/m/Y')]);
             fputcsv($file, []);
-            
+
             // Résumé
             fputcsv($file, ['RÉSUMÉ']);
             fputcsv($file, ['Revenus Complétés', $data['summary']['completed_revenue'] . ' €']);
@@ -698,7 +698,7 @@ class AdminFinanceController extends Controller
             fputcsv($file, ['Transactions', $data['summary']['transactions_count']]);
             fputcsv($file, ['Panier Moyen', $data['summary']['avg_basket'] . ' €']);
             fputcsv($file, []);
-            
+
             // Par formation
             fputcsv($file, ['REVENUS PAR FORMATION']);
             fputcsv($file, ['Formation', 'Revenus (€)', 'Transactions']);
@@ -706,19 +706,19 @@ class AdminFinanceController extends Controller
                 fputcsv($file, [$item->name, $item->revenue, $item->transactions]);
             }
             fputcsv($file, []);
-            
+
             // Remboursements
             fputcsv($file, ['REMBOURSEMENTS']);
             fputcsv($file, ['Nombre', $data['refunds']['count']]);
             fputcsv($file, ['Montant Total', $data['refunds']['total_amount'] . ' €']);
             fputcsv($file, ['Montant Moyen', $data['refunds']['avg_amount'] . ' €']);
-            
+
             fclose($file);
         };
-        
+
         return response()->stream($callback, 200, $headers);
     }
-    
+
     /**
      * Récupère l'évolution du taux de conversion
      * 

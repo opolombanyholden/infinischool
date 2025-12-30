@@ -10,25 +10,23 @@ class Grade extends Model
     use HasFactory;
 
     protected $fillable = [
-        'enrollment_id',
         'student_id',
-        'course_id',
         'subject_id',
         'teacher_id',
-        'grade',
-        'max_grade',
-        'type',
-        'weight',
-        'description',
-        'graded_at',
-        'comments',
+        'assessment_type',
+        'assessment_title',
+        'score',
+        'max_score',
+        'percentage',
+        'feedback',
+        'assessment_date',
     ];
 
     protected $casts = [
-        'grade' => 'decimal:2',
-        'max_grade' => 'decimal:2',
-        'weight' => 'decimal:2',
-        'graded_at' => 'datetime',
+        'score' => 'decimal:2',
+        'max_score' => 'decimal:2',
+        'percentage' => 'decimal:2',
+        'assessment_date' => 'date',
     ];
 
     // Relations
@@ -60,49 +58,51 @@ class Grade extends Model
     // Scopes
     public function scopePassed($query, $passingGrade = 10)
     {
-        return $query->whereRaw('(grade / max_grade) * 20 >= ?', [$passingGrade]);
+        return $query->whereRaw('(score / max_score) * 20 >= ?', [$passingGrade]);
     }
 
     public function scopeFailed($query, $passingGrade = 10)
     {
-        return $query->whereRaw('(grade / max_grade) * 20 < ?', [$passingGrade]);
+        return $query->whereRaw('(score / max_score) * 20 < ?', [$passingGrade]);
     }
 
     public function scopeByType($query, $type)
     {
-        return $query->where('type', $type);
+        return $query->where('assessment_type', $type);
     }
 
     public function scopeExams($query)
     {
-        return $query->where('type', 'exam');
+        return $query->where('assessment_type', 'Examen');
     }
 
     public function scopeQuizzes($query)
     {
-        return $query->where('type', 'quiz');
+        return $query->where('assessment_type', 'Quiz');
     }
 
     public function scopeAssignments($query)
     {
-        return $query->where('type', 'assignment');
+        return $query->where('assessment_type', 'Devoir');
     }
 
     public function scopeRecent($query, $days = 30)
     {
-        return $query->where('graded_at', '>=', now()->subDays($days));
+        return $query->where('assessment_date', '>=', now()->subDays($days));
     }
 
     // Helpers
     public function getPercentage()
     {
-        if ($this->max_grade == 0) return 0;
+        if ($this->max_grade == 0)
+            return 0;
         return round(($this->grade / $this->max_grade) * 100, 2);
     }
 
     public function getGradeOn20()
     {
-        if ($this->max_grade == 0) return 0;
+        if ($this->max_grade == 0)
+            return 0;
         return round(($this->grade / $this->max_grade) * 20, 2);
     }
 
@@ -119,22 +119,30 @@ class Grade extends Model
     public function getLetterGrade()
     {
         $percentage = $this->getPercentage();
-        
-        if ($percentage >= 90) return 'A';
-        if ($percentage >= 80) return 'B';
-        if ($percentage >= 70) return 'C';
-        if ($percentage >= 60) return 'D';
+
+        if ($percentage >= 90)
+            return 'A';
+        if ($percentage >= 80)
+            return 'B';
+        if ($percentage >= 70)
+            return 'C';
+        if ($percentage >= 60)
+            return 'D';
         return 'F';
     }
 
     public function getMention()
     {
         $gradeOn20 = $this->getGradeOn20();
-        
-        if ($gradeOn20 >= 16) return 'Très Bien';
-        if ($gradeOn20 >= 14) return 'Bien';
-        if ($gradeOn20 >= 12) return 'Assez Bien';
-        if ($gradeOn20 >= 10) return 'Passable';
+
+        if ($gradeOn20 >= 16)
+            return 'Très Bien';
+        if ($gradeOn20 >= 14)
+            return 'Bien';
+        if ($gradeOn20 >= 12)
+            return 'Assez Bien';
+        if ($gradeOn20 >= 10)
+            return 'Passable';
         return 'Insuffisant';
     }
 

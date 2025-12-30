@@ -360,7 +360,7 @@
                 <!-- More Questions CTA -->
                 <div class="text-center mt-4">
                     <p class="text-muted mb-3">Vous ne trouvez pas la réponse à votre question ?</p>
-                    <a href="{{ route('help') }}" class="btn btn-outline-primary">
+                    <a href="{{ route('help.index') }}" class="btn btn-outline-primary">
                         <i class="fas fa-life-ring me-2"></i>Consulter le Centre d'Aide
                     </a>
                 </div>

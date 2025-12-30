@@ -13,10 +13,31 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'password', 'phone', 'avatar', 'bio',
-        'birth_date', 'address', 'city', 'country', 'role', 'status',
-        'specialization', 'qualifications', 'hourly_rate', 'is_approved',
-        'student_number', 'level',
+        'name',
+        'email',
+        'password',
+        'phone',
+        'avatar',
+        'bio',
+        'birth_date',
+        'address',
+        'city',
+        'country',
+        'role',
+        'status',
+        'specialization',
+        'qualifications',
+        'hourly_rate',
+        'is_approved',
+        'student_number',
+        'level',
+        // Champs d'inscription
+        'desired_formation_id',
+        'desired_level',
+        'registration_status',
+        'approved_at',
+        'approved_by',
+        'rejection_reason',
     ];
 
     protected $hidden = [
@@ -29,6 +50,7 @@ class User extends Authenticatable
         'birth_date' => 'date',
         'is_approved' => 'boolean',
         'hourly_rate' => 'decimal:2',
+        'approved_at' => 'datetime',
     ];
 
     // ============================================
@@ -147,6 +169,22 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class, 'user_id');
     }
 
+    /**
+     * Formation souhaitée (pour inscription)
+     */
+    public function desiredFormation()
+    {
+        return $this->belongsTo(Formation::class, 'desired_formation_id');
+    }
+
+    /**
+     * Admin qui a validé l'inscription
+     */
+    public function approvedByUser()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
     // ============================================
     // SCOPES
     // ============================================
@@ -212,8 +250,8 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute()
     {
-        return $this->avatar 
-            ? asset('storage/' . $this->avatar) 
+        return $this->avatar
+            ? asset('storage/' . $this->avatar)
             : asset('images/default-avatar.png');
     }
 }

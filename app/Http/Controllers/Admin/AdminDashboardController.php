@@ -38,29 +38,29 @@ class AdminDashboardController extends Controller
         $kpis = Cache::remember('admin_kpis', 300, function () {
             return $this->getGlobalKPIs();
         });
-        
+
         // Statistiques en temps réel (pas de cache)
         $realtimeStats = $this->getRealtimeStats();
-        
+
         // Alertes importantes
         $alerts = $this->getSystemAlerts();
-        
+
         // Dernières activités (10 dernières)
         $recentActivities = $this->getRecentActivities(10);
-        
+
         // Données pour graphiques (30 derniers jours)
         $chartData = $this->getChartData(30);
-        
+
         // Top formations
         $topFormations = $this->getTopFormations(5);
-        
+
         // Top enseignants
         $topTeachers = $this->getTopTeachers(5);
-        
+
         // Statistiques financières
         $financialStats = $this->getFinancialStats();
-        
-        return view('admin.dashboard.index', compact(
+
+        return view('admin.dashboard', compact(
             'kpis',
             'realtimeStats',
             'alerts',
@@ -71,7 +71,7 @@ class AdminDashboardController extends Controller
             'financialStats'
         ));
     }
-    
+
     /**
      * Récupère les KPIs globaux de la plateforme
      * 
@@ -81,44 +81,44 @@ class AdminDashboardController extends Controller
     {
         $now = Carbon::now();
         $lastMonth = $now->copy()->subMonth();
-        
+
         // Total utilisateurs par rôle
         $totalUsers = User::count();
         $totalStudents = User::where('role', 'student')->count();
         $totalTeachers = User::where('role', 'teacher')->count();
         $totalAdmins = User::where('role', 'admin')->count();
-        
+
         // Croissance utilisateurs (vs mois dernier)
         $newUsersThisMonth = User::where('created_at', '>=', $lastMonth)->count();
         $newUsersLastMonth = User::whereBetween('created_at', [
             $lastMonth->copy()->subMonth(),
             $lastMonth
         ])->count();
-        $userGrowth = $newUsersLastMonth > 0 
-            ? (($newUsersThisMonth - $newUsersLastMonth) / $newUsersLastMonth) * 100 
+        $userGrowth = $newUsersLastMonth > 0
+            ? (($newUsersThisMonth - $newUsersLastMonth) / $newUsersLastMonth) * 100
             : 0;
-        
+
         // Formations et classes
         $totalFormations = Formation::where('status', 'active')->count();
         $totalClasses = ClassModel::count();
-        
+
         // Cours
         $totalCourses = Course::count();
         $liveCoursesCount = Course::where('status', 'live')->count();
         $scheduledCoursesCount = Course::where('status', 'scheduled')
-            ->where('start_time', '>', $now)
+            ->where('scheduled_at', '>', $now)
             ->count();
-        
+
         // Inscriptions
         $totalEnrollments = Enrollment::count();
         $activeEnrollments = Enrollment::where('status', 'active')->count();
         $completedEnrollments = Enrollment::where('status', 'completed')->count();
-        
+
         // Taux de complétion
-        $completionRate = $totalEnrollments > 0 
-            ? ($completedEnrollments / $totalEnrollments) * 100 
+        $completionRate = $totalEnrollments > 0
+            ? ($completedEnrollments / $totalEnrollments) * 100
             : 0;
-        
+
         // Revenus
         $totalRevenue = Payment::where('status', 'completed')->sum('amount');
         $revenueThisMonth = Payment::where('status', 'completed')
@@ -130,20 +130,20 @@ class AdminDashboardController extends Controller
                 $lastMonth
             ])
             ->sum('amount');
-        $revenueGrowth = $revenueLastMonth > 0 
-            ? (($revenueThisMonth - $revenueLastMonth) / $revenueLastMonth) * 100 
+        $revenueGrowth = $revenueLastMonth > 0
+            ? (($revenueThisMonth - $revenueLastMonth) / $revenueLastMonth) * 100
             : 0;
-        
+
         // Taux d'assiduité global
         $totalAttendances = Attendance::count();
         $presentAttendances = Attendance::where('status', 'present')->count();
-        $attendanceRate = $totalAttendances > 0 
-            ? ($presentAttendances / $totalAttendances) * 100 
+        $attendanceRate = $totalAttendances > 0
+            ? ($presentAttendances / $totalAttendances) * 100
             : 0;
-        
+
         // Note moyenne globale
-        $averageGrade = Grade::avg('grade') ?? 0;
-        
+        $averageGrade = Grade::avg('score') ?? 0;
+
         return [
             'users' => [
                 'total' => $totalUsers,
@@ -180,7 +180,7 @@ class AdminDashboardController extends Controller
             ],
         ];
     }
-    
+
     /**
      * Récupère les statistiques temps réel
      * 
@@ -189,35 +189,34 @@ class AdminDashboardController extends Controller
     private function getRealtimeStats(): array
     {
         $now = Carbon::now();
-        
+
         // Utilisateurs connectés (actifs dans les 15 dernières minutes)
-        $onlineUsers = User::where('last_activity_at', '>=', $now->copy()->subMinutes(15))
+        // Note: Using updated_at as a proxy for activity since last_activity_at column is missing
+        $onlineUsers = User::where('updated_at', '>=', $now->copy()->subMinutes(15))
             ->count();
-        
+
         // Cours en direct actuellement
         $liveNow = Course::where('status', 'live')
-            ->where('start_time', '<=', $now)
-            ->where('end_time', '>=', $now)
             ->count();
-        
+
         // Prochains cours (dans l'heure)
         $upcomingSoon = Course::where('status', 'scheduled')
-            ->whereBetween('start_time', [$now, $now->copy()->addHour()])
+            ->whereBetween('scheduled_at', [$now, $now->copy()->addHour()])
             ->count();
-        
+
         // Inscriptions aujourd'hui
         $enrollmentsToday = Enrollment::whereDate('created_at', $now->toDateString())
             ->count();
-        
+
         // Paiements aujourd'hui
         $paymentsToday = Payment::where('status', 'completed')
             ->whereDate('paid_at', $now->toDateString())
             ->count();
-        
+
         $revenueToday = Payment::where('status', 'completed')
             ->whereDate('paid_at', $now->toDateString())
             ->sum('amount');
-        
+
         return [
             'online_users' => $onlineUsers,
             'live_courses' => $liveNow,
@@ -227,7 +226,7 @@ class AdminDashboardController extends Controller
             'revenue_today' => round($revenueToday, 2),
         ];
     }
-    
+
     /**
      * Récupère les alertes système importantes
      * 
@@ -236,7 +235,7 @@ class AdminDashboardController extends Controller
     private function getSystemAlerts(): array
     {
         $alerts = [];
-        
+
         // Cours sans enseignant assigné
         $coursesWithoutTeacher = Course::whereNull('teacher_id')
             ->where('status', 'scheduled')
@@ -249,7 +248,7 @@ class AdminDashboardController extends Controller
                 'link' => route('admin.courses.index', ['filter' => 'no_teacher']),
             ];
         }
-        
+
         // Inscriptions en attente de validation
         $pendingTeachers = User::where('role', 'teacher')
             ->where('status', 'pending')
@@ -262,7 +261,7 @@ class AdminDashboardController extends Controller
                 'link' => route('admin.teachers.pending'),
             ];
         }
-        
+
         // Paiements échoués aujourd'hui
         $failedPayments = Payment::where('status', 'failed')
             ->whereDate('created_at', Carbon::today())
@@ -275,7 +274,7 @@ class AdminDashboardController extends Controller
                 'link' => route('admin.finance.failed-payments'),
             ];
         }
-        
+
         // Classes surchargées (plus de 30 étudiants)
         $overloadedClasses = ClassModel::withCount('students')
             ->having('students_count', '>', 30)
@@ -288,7 +287,7 @@ class AdminDashboardController extends Controller
                 'link' => route('admin.classes.index', ['filter' => 'overloaded']),
             ];
         }
-        
+
         // Stockage serveur (si > 80%)
         $diskUsage = $this->getDiskUsage();
         if ($diskUsage > 80) {
@@ -299,10 +298,10 @@ class AdminDashboardController extends Controller
                 'link' => route('admin.system.storage'),
             ];
         }
-        
+
         return $alerts;
     }
-    
+
     /**
      * Récupère les dernières activités
      * 
@@ -327,7 +326,7 @@ class AdminDashboardController extends Controller
                 ];
             });
     }
-    
+
     /**
      * Récupère les données pour les graphiques
      * 
@@ -338,7 +337,7 @@ class AdminDashboardController extends Controller
     {
         $startDate = Carbon::now()->subDays($days);
         $endDate = Carbon::now();
-        
+
         // Inscriptions par jour
         $enrollmentsByDay = Enrollment::selectRaw('DATE(created_at) as date, COUNT(*) as count')
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -346,7 +345,7 @@ class AdminDashboardController extends Controller
             ->orderBy('date')
             ->pluck('count', 'date')
             ->toArray();
-        
+
         // Revenus par jour
         $revenueByDay = Payment::selectRaw('DATE(paid_at) as date, SUM(amount) as total')
             ->where('status', 'completed')
@@ -355,28 +354,30 @@ class AdminDashboardController extends Controller
             ->orderBy('date')
             ->pluck('total', 'date')
             ->toArray();
-        
+
         // Présences par jour
         $attendanceByDay = Attendance::selectRaw('DATE(created_at) as date, 
             SUM(CASE WHEN status = "present" THEN 1 ELSE 0 END) as present,
             COUNT(*) as total')
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('date')
+            ->groupBy(DB::raw('DATE(created_at)'))
             ->orderBy('date')
             ->get()
             ->mapWithKeys(function ($item) {
-                return [$item->date => [
-                    'rate' => $item->total > 0 ? ($item->present / $item->total) * 100 : 0
-                ]];
+                return [
+                    $item->date => [
+                        'rate' => $item->total > 0 ? ($item->present / $item->total) * 100 : 0
+                    ]
+                ];
             })
             ->toArray();
-        
+
         // Créer un tableau complet avec toutes les dates
         $labels = [];
         $enrollmentsData = [];
         $revenueData = [];
         $attendanceData = [];
-        
+
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $dateStr = $date->toDateString();
             $labels[] = $date->format('d/m');
@@ -384,7 +385,7 @@ class AdminDashboardController extends Controller
             $revenueData[] = round($revenueByDay[$dateStr] ?? 0, 2);
             $attendanceData[] = round($attendanceByDay[$dateStr]['rate'] ?? 0, 1);
         }
-        
+
         return [
             'labels' => $labels,
             'enrollments' => $enrollmentsData,
@@ -392,7 +393,7 @@ class AdminDashboardController extends Controller
             'attendance' => $attendanceData,
         ];
     }
-    
+
     /**
      * Récupère les top formations
      * 
@@ -409,7 +410,7 @@ class AdminDashboardController extends Controller
                 $revenue = Payment::where('formation_id', $formation->id)
                     ->where('status', 'completed')
                     ->sum('amount');
-                
+
                 return [
                     'id' => $formation->id,
                     'name' => $formation->name,
@@ -419,7 +420,7 @@ class AdminDashboardController extends Controller
                 ];
             });
     }
-    
+
     /**
      * Récupère les top enseignants
      * 
@@ -435,31 +436,27 @@ class AdminDashboardController extends Controller
                     $query->where('status', 'completed');
                 }
             ])
-            ->with(['grades' => function ($query) {
-                $query->selectRaw('teacher_id, AVG(rating) as avg_rating')
-                    ->groupBy('teacher_id');
-            }])
             ->orderByDesc('courses_count')
             ->limit($limit)
             ->get()
             ->map(function ($teacher) {
                 $totalStudents = DB::table('enrollments')
-                    ->join('courses', 'enrollments.course_id', '=', 'courses.id')
+                    ->join('courses', 'enrollments.class_id', '=', 'courses.class_id')
                     ->where('courses.teacher_id', $teacher->id)
-                    ->distinct('enrollments.user_id')
-                    ->count('enrollments.user_id');
-                
+                    ->distinct('enrollments.student_id')
+                    ->count('enrollments.student_id');
+
                 return [
                     'id' => $teacher->id,
                     'name' => $teacher->name,
                     'avatar' => $teacher->avatar ?? '/images/default-avatar.png',
                     'courses_count' => $teacher->courses_count,
                     'students_count' => $totalStudents,
-                    'rating' => round($teacher->grades->first()->avg_rating ?? 0, 1),
+                    'rating' => 0, // TODO: Implémenter le système de notation des enseignants
                 ];
             });
     }
-    
+
     /**
      * Récupère les statistiques financières
      * 
@@ -468,7 +465,7 @@ class AdminDashboardController extends Controller
     private function getFinancialStats(): array
     {
         $now = Carbon::now();
-        
+
         // Revenus mensuels (12 derniers mois)
         $monthlyRevenue = Payment::selectRaw('
                 YEAR(paid_at) as year,
@@ -481,20 +478,20 @@ class AdminDashboardController extends Controller
             ->orderBy('year')
             ->orderBy('month')
             ->get();
-        
+
         // Chiffre d'affaires annuel
         $annualRevenue = Payment::where('status', 'completed')
             ->whereYear('paid_at', $now->year)
             ->sum('amount');
-        
+
         // Paiements en attente
         $pendingPayments = Payment::where('status', 'pending')->sum('amount');
-        
+
         // Taux de conversion
         $totalVisitors = 10000; // TODO: Intégrer avec Google Analytics
         $totalEnrollments = Enrollment::whereYear('created_at', $now->year)->count();
         $conversionRate = $totalVisitors > 0 ? ($totalEnrollments / $totalVisitors) * 100 : 0;
-        
+
         return [
             'annual_revenue' => round($annualRevenue, 2),
             'pending_amount' => round($pendingPayments, 2),
@@ -502,7 +499,7 @@ class AdminDashboardController extends Controller
             'monthly_data' => $monthlyRevenue,
         ];
     }
-    
+
     /**
      * Récupère l'utilisation du disque
      * 
@@ -513,30 +510,30 @@ class AdminDashboardController extends Controller
         $total = disk_total_space('/');
         $free = disk_free_space('/');
         $used = $total - $free;
-        
+
         return ($used / $total) * 100;
     }
-    
+
     /**
      * Export des statistiques en PDF
      * 
      * @param Request $request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\JsonResponse
      */
     public function exportStats(Request $request)
     {
         $startDate = $request->input('start_date', Carbon::now()->subMonth());
         $endDate = $request->input('end_date', Carbon::now());
-        
+
         // TODO: Implémenter avec DomPDF ou similar
         // $pdf = PDF::loadView('admin.reports.stats', compact('startDate', 'endDate'));
         // return $pdf->download('statistiques-infinischool.pdf');
-        
+
         return response()->json([
             'message' => 'Export PDF en développement',
         ]);
     }
-    
+
     /**
      * Rafraîchit les statistiques (vide le cache)
      * 
@@ -545,7 +542,7 @@ class AdminDashboardController extends Controller
     public function refreshStats()
     {
         Cache::forget('admin_kpis');
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Statistiques rafraîchies avec succès',

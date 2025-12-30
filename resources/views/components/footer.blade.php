@@ -8,19 +8,24 @@
                     <i class="fas fa-graduation-cap me-2"></i>InfiniSchool
                 </h5>
                 <p class="text-white-50 small">
-                    La plateforme e-learning qui révolutionne l'apprentissage en ligne avec des cours en direct et des formations de qualité.
+                    La plateforme e-learning qui révolutionne l'apprentissage en ligne avec des cours en direct et des
+                    formations de qualité.
                 </p>
                 <div class="d-flex gap-2 mt-3">
-                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle" style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle"
+                        style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-facebook-f"></i>
                     </a>
-                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle" style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle"
+                        style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-twitter"></i>
                     </a>
-                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle" style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle"
+                        style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-linkedin-in"></i>
                     </a>
-                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle" style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <a href="#" class="btn btn-outline-light btn-sm rounded-circle"
+                        style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-instagram"></i>
                     </a>
                 </div>
@@ -74,7 +79,7 @@
                     </li>
                     <li class="mb-2">
                         @auth
-                            <a href="{{ route('support.index') }}" class="text-white-50 text-decoration-none hover-link">
+                            <a href="{{ route('help.index') }}" class="text-white-50 text-decoration-none hover-link">
                                 <i class="fas fa-chevron-right fa-xs me-2"></i>Centre d'aide
                             </a>
                         @else
@@ -122,18 +127,14 @@
                         </a>
                     </li>
                 </ul>
-                
+
                 <!-- Newsletter -->
                 <div class="mt-4">
                     <h6 class="fw-bold mb-3 small">Newsletter</h6>
                     <form action="{{ route('contact.send') }}" method="POST" class="input-group input-group-sm">
                         @csrf
                         <input type="hidden" name="type" value="newsletter">
-                        <input type="email" 
-                               name="email" 
-                               class="form-control" 
-                               placeholder="Votre email"
-                               required>
+                        <input type="email" name="email" class="form-control" placeholder="Votre email" required>
                         <button class="btn btn-primary" type="submit">
                             <i class="fas fa-paper-plane"></i>
                         </button>
@@ -163,19 +164,19 @@
 </footer>
 
 <style>
-/* Effet hover sur les liens */
-.hover-link {
-    transition: all 0.3s ease;
-}
+    /* Effet hover sur les liens */
+    .hover-link {
+        transition: all 0.3s ease;
+    }
 
-.hover-link:hover {
-    color: #fff !important;
-    padding-left: 5px;
-}
+    .hover-link:hover {
+        color: #fff !important;
+        padding-left: 5px;
+    }
 
-/* Style boutons sociaux */
-.btn-outline-light:hover {
-    background-color: #800020;
-    border-color: #800020;
-}
+    /* Style boutons sociaux */
+    .btn-outline-light:hover {
+        background-color: #800020;
+        border-color: #800020;
+    }
 </style>

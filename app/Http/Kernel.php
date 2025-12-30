@@ -63,15 +63,21 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        
+
         // ============================================
         // MIDDLEWARE PERSONNALISÉ INFINISCHOOL
         // ============================================
-        
+
         /**
          * Middleware de vérification des rôles
          * Usage: middleware('role:admin') ou middleware('role:teacher,admin')
          */
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+
+        /**
+         * Middleware de vérification de l'approbation d'inscription
+         * Vérifie que le statut registration_status est 'approved'
+         */
+        'approved' => \App\Http\Middleware\CheckRegistrationApproved::class,
     ];
 }

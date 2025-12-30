@@ -49,22 +49,22 @@ use App\Http\Controllers\Teacher\MessageController as TeacherMessageController;
 use App\Http\Controllers\Teacher\EarningController as TeacherEarningController;
 
 // Controllers Administrateur
-use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Admin\FormationController as AdminFormationController;
-use App\Http\Controllers\Admin\ClassController as AdminClassController;
-use App\Http\Controllers\Admin\TeacherController as AdminTeacherController;
-use App\Http\Controllers\Admin\StudentController as AdminStudentController;
-use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
-use App\Http\Controllers\Admin\RevenueController as AdminRevenueController;
-use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
-use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
-use App\Http\Controllers\Admin\ReportController as AdminReportController;
-use App\Http\Controllers\Admin\SupportController as AdminSupportController;
-use App\Http\Controllers\Admin\RequestController as AdminRequestController;
-use App\Http\Controllers\Admin\AlertController as AdminAlertController;
-use App\Http\Controllers\Admin\SettingController as AdminSettingController;
-use App\Http\Controllers\Admin\SystemController as AdminSystemController;
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AdminFormationController;
+use App\Http\Controllers\Admin\AdminClassController;
+use App\Http\Controllers\Admin\AdminTeacherController;
+use App\Http\Controllers\Admin\AdminStudentController;
+use App\Http\Controllers\Admin\AdminFinanceController as AdminPaymentController;
+use App\Http\Controllers\Admin\AdminFinanceController as AdminRevenueController;
+use App\Http\Controllers\Admin\AdminReviewController; // Assuming exists or will fail, but stick to pattern
+use App\Http\Controllers\Admin\AdminActivityController; // Assuming exists
+use App\Http\Controllers\Admin\AdminReportController; // Assuming exists
+use App\Http\Controllers\Admin\AdminSupportController; // Assuming exists
+use App\Http\Controllers\Admin\AdminRequestController; // Assuming exists
+use App\Http\Controllers\Admin\AdminAlertController; // Assuming exists
+use App\Http\Controllers\Admin\AdminSettingsController as AdminSettingController;
+use App\Http\Controllers\Admin\AdminSystemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -117,17 +117,17 @@ Route::post('/devenir-enseignant', [TeacherController::class, 'submitApplication
 Route::middleware(['guest'])->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
-    
+
     // Inscription
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
     Route::post('/register', [RegisterController::class, 'register']);
-    
+
     // Mot de passe oublié
     Route::get('/password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
     Route::post('/password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
     Route::get('/password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
     Route::post('/password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
-    
+
     // OAuth Social Login
     Route::get('/auth/{provider}', [SocialController::class, 'redirect'])->name('auth.social');
     Route::get('/auth/{provider}/callback', [SocialController::class, 'callback']);
@@ -145,17 +145,33 @@ Route::middleware(['auth'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| Routes d'Inscription (processus de validation)
+|--------------------------------------------------------------------------
+*/
+
+// Page de confirmation après inscription (guest)
+Route::get('/registration/confirmed', function () {
+    return view('auth.registration-confirmed');
+})->name('registration.confirmed')->middleware('guest');
+
+// Page d'attente de validation (auth - utilisateurs non encore approuvés)
+Route::get('/registration/pending', function () {
+    return view('auth.pending-approval');
+})->name('registration.pending')->middleware('auth');
+
+/*
+|--------------------------------------------------------------------------
 | Dashboard Générique (redirection selon rôle)
 |--------------------------------------------------------------------------
 */
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    
+
     if (!$user) {
         return redirect()->route('login');
     }
-    
+
     switch ($user->role) {
         case 'admin':
             return redirect()->route('admin.dashboard');
@@ -174,7 +190,7 @@ Route::get('/dashboard', function () {
 */
 
 Route::middleware(['auth'])->group(function () {
-    
+
     // Profil utilisateur
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
@@ -188,7 +204,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/2fa/disable', [ProfileController::class, 'disable2FA'])->name('2fa.disable');
         Route::delete('/', [ProfileController::class, 'delete'])->name('delete');
     });
-    
+
     // Messagerie (accessible à tous les rôles)
     Route::prefix('messages')->name('messages.')->group(function () {
         Route::get('/', [MessageController::class, 'index'])->name('index');
@@ -200,7 +216,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{message}/mark-read', [MessageController::class, 'markAsRead'])->name('mark-read');
         Route::post('/mark-all-read', [MessageController::class, 'markAllAsRead'])->name('mark-all-read');
     });
-    
+
     // Notifications (accessible à tous les rôles)
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('index');
@@ -208,7 +224,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
-    
+
     // Support/Aide utilisateur (renommé en "help" pour éviter conflit avec admin.support)
     Route::prefix('help')->name('help.')->group(function () {
         Route::get('/', [SupportController::class, 'index'])->name('index');
@@ -218,7 +234,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{ticket}/reply', [SupportController::class, 'reply'])->name('reply');
         Route::post('/{ticket}/close', [SupportController::class, 'close'])->name('close');
     });
-    
+
 });
 
 /*
@@ -231,7 +247,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/formations/{slug}/enroll', [EnrollmentController::class, 'create'])->name('formations.enroll');
     Route::post('/formations/{slug}/enroll', [EnrollmentController::class, 'store'])->name('formations.enroll.store');
     Route::post('/enrollments/{enrollment}/cancel', [EnrollmentController::class, 'cancel'])->name('enrollments.cancel');
-    
+
     // Paiement
     Route::get('/payment/checkout/{enrollment}', [EnrollmentController::class, 'checkout'])->name('payment.checkout');
     Route::post('/payment/process/{enrollment}', [EnrollmentController::class, 'processPayment'])->name('payment.process');
@@ -245,11 +261,11 @@ Route::middleware(['auth'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')->group(function () {
-    
+Route::middleware(['auth', 'approved', 'role:student'])->prefix('student')->name('student.')->group(function () {
+
     // Dashboard
     Route::get('/dashboard', [StudentDashboardController::class, 'index'])->name('dashboard');
-    
+
     // Formations/Cours
     Route::prefix('courses')->name('courses.')->group(function () {
         Route::get('/', [StudentCourseController::class, 'index'])->name('index');
@@ -258,19 +274,19 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
         Route::get('/{enrollment}/resume', [StudentCourseController::class, 'resume'])->name('resume');
         Route::post('/{enrollment}/complete-lesson', [StudentCourseController::class, 'completeLesson'])->name('complete-lesson');
     });
-    
+
     // Planning/Calendrier
     Route::prefix('schedule')->name('schedule.')->group(function () {
         Route::get('/', [StudentScheduleController::class, 'index'])->name('index');
         Route::get('/ical', [StudentScheduleController::class, 'ical'])->name('ical');
     });
-    
+
     // Progression
     Route::prefix('progress')->name('progress.')->group(function () {
         Route::get('/', [StudentProgressController::class, 'index'])->name('index');
         Route::get('/{enrollment}', [StudentProgressController::class, 'show'])->name('show');
     });
-    
+
     // Devoirs
     Route::prefix('assignments')->name('assignments.')->group(function () {
         Route::get('/', [StudentAssignmentController::class, 'index'])->name('index');
@@ -278,39 +294,39 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
         Route::post('/{assignment}/submit', [StudentAssignmentController::class, 'submit'])->name('submit');
         Route::get('/{assignment}/download', [StudentAssignmentController::class, 'download'])->name('download');
     });
-    
+
     // Ressources
     Route::prefix('resources')->name('resources.')->group(function () {
         Route::get('/', [StudentResourceController::class, 'index'])->name('index');
         Route::get('/{resource}/download', [StudentResourceController::class, 'download'])->name('download');
     });
-    
+
     // Enregistrements de cours
     Route::prefix('recordings')->name('recordings.')->group(function () {
         Route::get('/', [StudentRecordingController::class, 'index'])->name('index');
         Route::get('/{recording}', [StudentRecordingController::class, 'show'])->name('show');
     });
-    
+
     // Notes
     Route::prefix('grades')->name('grades.')->group(function () {
         Route::get('/', [StudentGradeController::class, 'index'])->name('index');
         Route::get('/{enrollment}', [StudentGradeController::class, 'show'])->name('show');
     });
-    
+
     // Certificats
     Route::prefix('certificates')->name('certificates.')->group(function () {
         Route::get('/', [StudentCertificateController::class, 'index'])->name('index');
         Route::get('/{enrollment}/download', [StudentCertificateController::class, 'download'])->name('download');
         Route::get('/{certificate}/verify', [StudentCertificateController::class, 'verify'])->name('verify');
     });
-    
+
     // Communauté/Forum
     Route::prefix('community')->name('community.')->group(function () {
         Route::get('/', [StudentCommunityController::class, 'index'])->name('index');
         Route::get('/{topic}', [StudentCommunityController::class, 'show'])->name('show');
         Route::post('/{topic}/reply', [StudentCommunityController::class, 'reply'])->name('reply');
     });
-    
+
 });
 
 /*
@@ -320,10 +336,10 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
 */
 
 Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
-    
+
     // Dashboard
     Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('dashboard');
-    
+
     // Gestion des cours/formations
     Route::prefix('courses')->name('courses.')->group(function () {
         Route::get('/', [TeacherCourseController::class, 'index'])->name('index');
@@ -337,7 +353,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
         Route::post('/{course}/publish', [TeacherCourseController::class, 'publish'])->name('publish');
         Route::post('/{course}/unpublish', [TeacherCourseController::class, 'unpublish'])->name('unpublish');
     });
-    
+
     // Planning
     Route::prefix('schedule')->name('schedule.')->group(function () {
         Route::get('/', [TeacherScheduleController::class, 'index'])->name('index');
@@ -347,7 +363,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
         Route::put('/{class}', [TeacherScheduleController::class, 'update'])->name('update');
         Route::delete('/{class}', [TeacherScheduleController::class, 'destroy'])->name('destroy');
     });
-    
+
     // Classes en direct
     Route::prefix('classes')->name('classes.')->group(function () {
         Route::get('/', [TeacherClassController::class, 'index'])->name('index');
@@ -356,7 +372,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
         Route::post('/{class}/end', [TeacherClassController::class, 'end'])->name('end');
         Route::post('/{class}/attendance', [TeacherClassController::class, 'recordAttendance'])->name('attendance');
     });
-    
+
     // Ressources
     Route::prefix('resources')->name('resources.')->group(function () {
         Route::get('/', [TeacherResourceController::class, 'index'])->name('index');
@@ -364,7 +380,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
         Route::post('/', [TeacherResourceController::class, 'store'])->name('store');
         Route::delete('/{resource}', [TeacherResourceController::class, 'destroy'])->name('destroy');
     });
-    
+
     // Notation
     Route::prefix('grades')->name('grades.')->group(function () {
         Route::get('/', [TeacherGradeController::class, 'index'])->name('index');
@@ -372,35 +388,35 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
         Route::post('/{enrollment}/grade', [TeacherGradeController::class, 'store'])->name('store');
         Route::put('/{grade}', [TeacherGradeController::class, 'update'])->name('update');
     });
-    
+
     // Analytics
     Route::prefix('analytics')->name('analytics.')->group(function () {
         Route::get('/', [TeacherAnalyticsController::class, 'index'])->name('index');
         Route::get('/{course}', [TeacherAnalyticsController::class, 'show'])->name('show');
     });
-    
+
     // Gestion étudiants
     Route::prefix('students')->name('students.')->group(function () {
         Route::get('/', [TeacherStudentController::class, 'index'])->name('index');
         Route::get('/{student}', [TeacherStudentController::class, 'show'])->name('show');
     });
-    
+
     // Messages
     Route::prefix('messages')->name('messages.')->group(function () {
         Route::get('/', [TeacherMessageController::class, 'index'])->name('index');
         Route::get('/{message}', [TeacherMessageController::class, 'show'])->name('show');
     });
-    
+
     // Revenus
     Route::prefix('earnings')->name('earnings.')->group(function () {
         Route::get('/', [TeacherEarningController::class, 'index'])->name('index');
         Route::get('/history', [TeacherEarningController::class, 'history'])->name('history');
         Route::get('/export', [TeacherEarningController::class, 'export'])->name('export');
     });
-    
+
     // Profil enseignant
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
-    
+
 });
 
 /*
@@ -410,10 +426,10 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
 */
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    
+
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-    
+
     // Gestion utilisateurs
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [AdminUserController::class, 'index'])->name('index');
@@ -426,8 +442,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{user}/impersonate', [AdminUserController::class, 'impersonate'])->name('impersonate');
         Route::post('/{user}/ban', [AdminUserController::class, 'ban'])->name('ban');
         Route::post('/{user}/unban', [AdminUserController::class, 'unban'])->name('unban');
+
+        // Inscriptions en attente
+        Route::get('/pending/registrations', [AdminUserController::class, 'pendingRegistrations'])->name('pending');
+        Route::post('/{user}/approve', [AdminUserController::class, 'approveRegistration'])->name('approve');
+        Route::post('/{user}/reject', [AdminUserController::class, 'rejectRegistration'])->name('reject');
     });
-    
+
     // Gestion formations
     Route::prefix('formations')->name('formations.')->group(function () {
         Route::get('/', [AdminFormationController::class, 'index'])->name('index');
@@ -442,7 +463,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{formation}/approve', [AdminFormationController::class, 'approve'])->name('approve');
         Route::post('/{formation}/reject', [AdminFormationController::class, 'reject'])->name('reject');
     });
-    
+
     // Gestion classes
     Route::prefix('classes')->name('classes.')->group(function () {
         Route::get('/', [AdminClassController::class, 'index'])->name('index');
@@ -455,7 +476,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/{class}/students', [AdminClassController::class, 'students'])->name('students');
         Route::post('/{class}/assign-students', [AdminClassController::class, 'assignStudents'])->name('assign-students');
     });
-    
+
     // Gestion enseignants
     Route::prefix('teachers')->name('teachers.')->group(function () {
         Route::get('/', [AdminTeacherController::class, 'index'])->name('index');
@@ -464,41 +485,43 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{teacher}/approve', [AdminTeacherController::class, 'approve'])->name('approve');
         Route::post('/{teacher}/reject', [AdminTeacherController::class, 'reject'])->name('reject');
     });
-    
+
     // Gestion étudiants
     Route::prefix('students')->name('students.')->group(function () {
         Route::get('/', [AdminStudentController::class, 'index'])->name('index');
         Route::get('/{student}', [AdminStudentController::class, 'show'])->name('show');
         Route::get('/{student}/enrollments', [AdminStudentController::class, 'enrollments'])->name('enrollments');
     });
-    
+
     // Gestion paiements
     Route::prefix('payments')->name('payments.')->group(function () {
         Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
         Route::get('/{payment}', [AdminPaymentController::class, 'show'])->name('show');
         Route::post('/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('refund');
     });
-    
+
     // Revenus
     Route::prefix('revenue')->name('revenue.')->group(function () {
         Route::get('/', [AdminRevenueController::class, 'index'])->name('index');
         Route::get('/export', [AdminRevenueController::class, 'export'])->name('export');
     });
-    
+
     // Avis/Reviews
     Route::prefix('reviews')->name('reviews.')->group(function () {
         Route::get('/', [AdminReviewController::class, 'index'])->name('index');
         Route::get('/flagged', [AdminReviewController::class, 'flagged'])->name('flagged');
         Route::post('/{review}/approve', [AdminReviewController::class, 'approve'])->name('approve');
+        Route::post('/{review}/reject', [AdminReviewController::class, 'reject'])->name('reject');
         Route::delete('/{review}', [AdminReviewController::class, 'destroy'])->name('destroy');
     });
-    
+
+
     // Activités
     Route::prefix('activity')->name('activity.')->group(function () {
         Route::get('/', [AdminActivityController::class, 'index'])->name('index');
         Route::get('/export', [AdminActivityController::class, 'export'])->name('export');
     });
-    
+
     // Rapports
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [AdminReportController::class, 'index'])->name('index');
@@ -507,15 +530,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/courses', [AdminReportController::class, 'courses'])->name('courses');
         Route::get('/attendance', [AdminReportController::class, 'attendance'])->name('attendance');
     });
-    
+
     // Support Admin
     Route::prefix('support')->name('support.')->group(function () {
         Route::get('/', [AdminSupportController::class, 'index'])->name('index');
         Route::get('/{ticket}', [AdminSupportController::class, 'show'])->name('show');
         Route::post('/{ticket}/assign', [AdminSupportController::class, 'assign'])->name('assign');
         Route::post('/{ticket}/resolve', [AdminSupportController::class, 'resolve'])->name('resolve');
+        Route::post('/{ticket}/reply', [AdminSupportController::class, 'reply'])->name('reply');
     });
-    
+
+
     // Demandes en attente
     Route::prefix('requests')->name('requests.')->group(function () {
         Route::get('/', [AdminRequestController::class, 'index'])->name('index');
@@ -523,13 +548,16 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{request}/approve', [AdminRequestController::class, 'approve'])->name('approve');
         Route::post('/{request}/reject', [AdminRequestController::class, 'reject'])->name('reject');
     });
-    
+
     // Alertes système
     Route::prefix('alerts')->name('alerts.')->group(function () {
         Route::get('/', [AdminAlertController::class, 'index'])->name('index');
         Route::post('/send', [AdminAlertController::class, 'send'])->name('send');
+        Route::post('/{alert}/toggle', [AdminAlertController::class, 'toggle'])->name('toggle');
+        Route::delete('/{alert}', [AdminAlertController::class, 'destroy'])->name('destroy');
     });
-    
+
+
     // Paramètres
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [AdminSettingController::class, 'index'])->name('index');
@@ -539,17 +567,25 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::get('/integrations', [AdminSettingController::class, 'integrations'])->name('integrations');
         Route::get('/security', [AdminSettingController::class, 'security'])->name('security');
     });
-    
+
     // Système
     Route::prefix('system')->name('system.')->group(function () {
         Route::get('/', [AdminSystemController::class, 'index'])->name('index');
         Route::get('/logs', [AdminSystemController::class, 'logs'])->name('logs');
+        Route::get('/storage', [AdminSystemController::class, 'storage'])->name('storage');
+        Route::post('/storage/cleanup', [AdminSystemController::class, 'cleanupTemp'])->name('cleanup-temp');
+        Route::get('/maintenance', [AdminSystemController::class, 'maintenance'])->name('maintenance');
+        Route::post('/maintenance/enable', [AdminSystemController::class, 'enableMaintenance'])->name('maintenance.enable');
+        Route::post('/maintenance/disable', [AdminSystemController::class, 'disableMaintenance'])->name('maintenance.disable');
+        Route::get('/metrics', [AdminSystemController::class, 'metrics'])->name('metrics');
         Route::post('/cache/clear', [AdminSystemController::class, 'clearCache'])->name('clear-cache');
         Route::post('/optimize', [AdminSystemController::class, 'optimize'])->name('optimize');
         Route::get('/backups', [AdminSystemController::class, 'backups'])->name('backups');
         Route::post('/backup/create', [AdminSystemController::class, 'createBackup'])->name('create-backup');
+        Route::get('/backup/{filename}/download', [AdminSystemController::class, 'downloadBackup'])->name('backup.download');
+        Route::delete('/backup/{filename}', [AdminSystemController::class, 'deleteBackup'])->name('backup.delete');
     });
-    
+
 });
 
 // Stop Impersonation (admin)
